@@ -1,0 +1,5 @@
+library(lmtest)
+head(ChickEgg)
+plot.ts(ChickEgg)
+grangertest(chicken ~ egg, order =3, data=ChickEgg)
+grangertest(egg ~ chicken, order =3, data=ChickEgg)

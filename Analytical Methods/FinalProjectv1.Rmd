@@ -1,0 +1,444 @@
+---
+title: "Week 5 Chaz Clark Stock Data"
+output: html_notebook
+---
+Resources:
+```{r}
+library(quantmod)
+library(xts)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(gapminder)
+library(TTR)
+library(plyr)
+#library(tidyverse)
+#library(ggplot2)
+```
+
+Other Resources:
+```{r}
+#
+#   TTR: Technical Trading Rules
+#
+#   Copyright (C) 2007-2013  Joshua M. Ulrich
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 2 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+"pivots" <-
+function(data, lagts=TRUE) {
+
+  # Author: Brian G. Peterson
+  # http://www.investopedia.com/articles/forex/05/FXpivots.asp
+  # http://www.investopedia.com/articles/technical/04/041404.asp
+
+  # CentralPivot Point (P) = (High + Low + Close) / 3
+  center <- xts(rowSums(HLC(data))/3,order.by=index(data))
+
+  R1 <- (2*center)-Lo(data)  # First Resistance (R1) = (2*P) - Low
+  S1 <- (2*center)-Hi(data)  # First Support (S1) = (2*P) - High
+  R2 <- center + (R1 - S1)   # Second Resistance (R2) = P + (R1-S1)
+  S2 <- center - (R1 - S1)   # Second Support (S2) = P - (R1- S1)
+  ret <- cbind(center,R1,R2,S1,S2)
+  colnames(ret) <- c('center','R1','R2','S1','S2')
+  if(lagts){
+    newrow <- xts(t(rep(NA,5)), order.by=last(index(data))+1)
+    ret <- rbind(ret,newrow)
+    ret <- lag.xts(ret)
+  }
+  return(ret)
+}
+
+```
+
+Pulling the Data from Online:
+```{r}
+options("getSymbols.warning4.0"=FALSE)
+#list <- c('AAPL','QQQ')
+getSymbols('AAPL')
+candleChart(AAPL,subset='2017-12::2019', type='candles',TA="addBBands(n=20)")
+tail(AAPL)
+```
+
+Feature Engineering at the Daily Level in xts format then convert to datatable:
+```{r}
+AAPL$Center <- with(AAPL, xts(rowSums(HLC(AAPL))/3,order.by=index(AAPL)))
+AAPL$R1 <- with(AAPL, (2*AAPL$Center)-Lo(AAPL)) # First Resistance (R1) = (2*P) - Low
+AAPL$S1 <- with(AAPL, (2*AAPL$Center)-Hi(AAPL)) # First Support (S1) = (2*P) - High
+AAPL$R2 <- with(AAPL, AAPL$Center + (AAPL$R1 - AAPL$S1)) # Second Resistance (R2) = P + (R1-S1)
+AAPL$S2 <- with(AAPL, AAPL$Center - (AAPL$R1 - AAPL$S1)) # Second Support (S2) = P - (R1- S1)
+AAPL$DCH35 <- with(AAPL, DonchianChannel(AAPL$AAPL.High,n=35, include.lag = FALSE))
+AAPL$DCL35 <- with(AAPL, DonchianChannel(AAPL$AAPL.Low,n=35, include.lag = FALSE))
+AAPL$DCH15 <- with(AAPL, DonchianChannel(AAPL$AAPL.High,n=15, include.lag = FALSE))
+AAPL$DCL15 <- with(AAPL, DonchianChannel(AAPL$AAPL.Low,n=15, include.lag = FALSE))
+tail(AAPL)
+DataTable <- data.table(Date=index(AAPL), coredata(AAPL))
+AAPLw <- to.weekly(AAPL)
+```
+
+See the latest Data:
+```{r}
+tail(DataTable)
+```
+
+Feature Engineering at Daily Granularity after converted to DataTable
+```{r}
+DataTable$CloseMinusOpen <- with(DataTable, DataTable$AAPL.Close - DataTable$AAPL.Open)
+DataTable$LagClose <- with(DataTable, Lag(Cl(AAPL)))
+DataTable$NextClose <- with(DataTable, Next(Cl(AAPL)))
+DataTable$LagNextClose <- with(DataTable, abs(DataTable$LagClose) + abs(DataTable$NextClose))
+DataTable$LagOpen <- with(DataTable, Lag(Op(AAPL)))
+DataTable$NextOpen <- with(DataTable, Next(Op(AAPL)))
+DataTable$LagNextOpen <- with(DataTable, abs(DataTable$LagOpen) + abs(DataTable$NextOpen))
+DataTable$Year <- with(DataTable, substr(Date,1,4))
+DataTable$Month <- with(DataTable, substr(Date,6,7))
+DataTable$Day <- with(DataTable, substr(Date,9,10))
+DataTable$WeekNo <- with(DataTable, strftime(Date,format = "%V"))
+DataTable$YearWeekNo <- with(DataTable, paste(DataTable$Year,DataTable$WeekNo, sep = ""))
+DataTable$DateInt <- with(DataTable, paste(DataTable$Year,DataTable$Month,DataTable$Day, sep = ""))
+DataTable$DateInt <- as.numeric(DataTable$DateInt)
+DataTable$Direction <- with(DataTable, ifelse(DataTable$CloseMinusOpen >= 0,1,0))
+DataTable$WeekDay <- with(DataTable, weekdays(DataTable$Date, abbreviate = TRUE))
+tail(DataTable)
+```
+
+Convert Data to Weekly View Aggreataion:
+```{r}
+#AAPLw <- to.weekly(AAPL)
+DataTableSum <- DataTable %>%
+  dplyr::group_by(YearWeekNo) %>%
+  dplyr::summarise(Date2 = first(DateInt),Open2 = first(AAPL.Open),High2 = max(AAPL.High),Low2 = min(AAPL.Low),Close2 = last(AAPL.Close), Volume2 = sum(AAPL.Volume),CloseMinusOpen2 = Close2 - Open2,CloseMaxw = max(LagNextClose), CloseMinw = min(LagNextClose), OpenMaxw = max(LagNextOpen), OpenMinw = min(LagNextOpen),DaysInWeek = n(),Center2 = (High2 + Low2 + Close2)/3, Res1 = (2*Center2)-Low2,Sup1 = (2*Center2)-High2, Res2 = Center2 + (Res1 - Sup1), Sup2 = Center2 - (Res1 - Sup1)) %>%
+    ungroup() 
+tail(DataTableSum)
+```
+
+Feature Engineering for the Weekly View:
+```{r}
+DataTableSum$Direction <- with(DataTableSum, ifelse(DataTableSum$CloseMinusOpen2 > 0,1,0))
+DataTableSum$LagDirection <- shift(DataTableSum$Direction,type = "lag")
+DataTableSum$NextDirection <- shift(DataTableSum$Direction,type = "lead")
+DataTableSum$DirectionSum <- with(DataTableSum, DataTableSum$Direction + DataTableSum$LagDirection + DataTableSum$NextDirection)
+DataTableSum$DirectionCode <- with(DataTableSum, paste(DataTableSum$Direction,DataTableSum$LagDirection,DataTableSum$NextDirection, sep = ""))
+DataTableSum$ChangePoint <- with(DataTableSum, ifelse(DataTableSum$DirectionSum == 1 | DataTableSum$DirectionSum == 2,1,0))
+DataTableSum$CPDMax <- with(DataTableSum, ifelse(DataTableSum$ChangePoint ==1 & DataTableSum$Direction ==1,1,0))
+DataTableSum$CPDMmin <- with(DataTableSum, ifelse(DataTableSum$ChangePoint ==1 & DataTableSum$Direction ==0,1,0))
+DataTableSum$EMA20 <- with(DataTableSum, EMA(DataTableSum$Close2, 20))
+DataTableSum$EMA50 <- with(DataTableSum, EMA(DataTableSum$Close2, 50))
+DataTableSum$EMA200 <- with(DataTableSum, EMA(DataTableSum$Close2, 200))
+DataTableSum$DCH35 <- with(DataTableSum, DonchianChannel(DataTableSum$High2,n=35, include.lag = FALSE))
+DataTableSum$DCL35 <- with(DataTableSum, DonchianChannel(DataTableSum$Low2,n=35, include.lag = FALSE))
+DataTableSum$DCH15 <- with(DataTableSum, DonchianChannel(DataTableSum$High2,n=15, include.lag = FALSE))
+DataTableSum$DCL15 <- with(DataTableSum, DonchianChannel(DataTableSum$Low2,n=15, include.lag = FALSE))
+DataTableSum$Date3 <- with(DataTableSum, as.Date(as.character(DataTableSum$Date2),format='%Y%m%d'))
+DataTableSum$EMA20INOC <- with(DataTableSum, ifelse(DataTableSum$Open2 > DataTableSum$EMA20 & DataTableSum$Close2 < DataTableSum$EMA20,1,0))
+DataTableSum$EMA20INHL <- with(DataTableSum, ifelse(DataTableSum$High2 > DataTableSum$EMA20 & DataTableSum$Low2 < DataTableSum$EMA20,1,0))
+DataTableSum$CPDMaxEMA20 <- with(DataTableSum, ifelse((DataTableSum$CPDMax ==1) & ((DataTableSum$EMA20INOC ==1) | (DataTableSum$EMA20INHL==1)),1,0))
+DataTableSum$CPDMinEMA20 <- with(DataTableSum, ifelse((DataTableSum$CPDMmin ==1) & ((DataTableSum$EMA20INOC ==1) | (DataTableSum$EMA20INHL==1)),1,0))
+#tail(DataTableSum)
+```
+
+View weekly data in chart:
+```{r}
+candleChart(AAPLw,subset='2017-12::2019', type='candles',TA="addBBands(n=20);addEMA(20);addEMA(50)")
+```
+
+Find the Sup and Res Line Equations:
+```{r}
+library(ggplot2)
+ggplot2(DataTableSum, aes(x=Date3)) +
+  geom_line(aes(y = Sup1), color = "darkred")+
+  geom_line(aes(y = Sup2), color = "steelblue", linetype="twodash")+
+  geom_line(aes(y = Res1), color = "darkred")+
+  geom_line(aes(y = Res2), color = "steelblue", linetype="twodash")+
+  geom_line(aes(y = Center2), color = "green")+
+  geom_line(aes(y = EMA20), color = "purple")+
+  geom_line(aes(y = EMA50), color = "orange")+
+  geom_line(aes(y = EMA200), color = "pink")+
+  scale_x_date(limits = as.Date(c('2018-01-01','2019-12-31')))+
+  ylim(140,255)
+```
+
+Calculate the Max's Slopes
+```{r}
+DataTableSlopeMax <- DataTableSum %>%
+  dplyr::filter(DataTableSum$CPDMaxEMA20 == 1)
+  #dplyr::select(DataTableSum$Close2,DataTableSum$Res1,DataTableSum$Res2)
+#tail(DataTableSum)
+
+DataTableSlopeMax$LagClose2 <- with(DataTableSlopeMax, lag(DataTableSlopeMax$Close2))
+DataTableSlopeMax$LagDate3 <- with(DataTableSlopeMax, lag(DataTableSlopeMax$Date3))
+DataTableSlopeMax$ClLagCl2Diff <- with(DataTableSlopeMax, DataTableSlopeMax$Close2 - DataTableSlopeMax$LagClose2)
+DataTableSlopeMax$DTLagDT3Diff <- with(DataTableSlopeMax, difftime(DataTableSlopeMax$Date3 , DataTableSlopeMax$LagDate3, units = c("days")))
+DataTableSlopeMax$MaxSlope <- with(DataTableSlopeMax, as.numeric(DataTableSlopeMax$ClLagCl2Diff) / as.numeric(DataTableSlopeMax$DTLagDT3Diff))
+
+DataTableSlopeMax <- subset(DataTableSlopeMax,select=c("Date2","MaxSlope"))
+
+```
+
+Calculate the Min's Slopes
+```{r}
+DataTableSlopeMin <- DataTableSum %>%
+  dplyr::filter(DataTableSum$CPDMinEMA20 == 1)
+  #dplyr::select(DataTableSum$Close2,DataTableSum$Res1,DataTableSum$Res2)
+#tail(DataTableSum)
+
+DataTableSlopeMin$LagOpen2 <- with(DataTableSlopeMin, lag(DataTableSlopeMin$Open2))
+DataTableSlopeMin$LagDate3 <- with(DataTableSlopeMin, lag(DataTableSlopeMin$Date3))
+DataTableSlopeMin$OpLagOp2Diff <- with(DataTableSlopeMin, DataTableSlopeMin$Open2 - DataTableSlopeMin$LagOpen2)
+DataTableSlopeMin$DTLagDT3Diff <- with(DataTableSlopeMin, difftime(DataTableSlopeMin$Date3 , DataTableSlopeMin$LagDate3, units = c("days")))
+DataTableSlopeMin$MinSlope <- with(DataTableSlopeMin, as.numeric(DataTableSlopeMin$OpLagOp2Diff) / as.numeric(DataTableSlopeMin$DTLagDT3Diff))
+
+DataTableSlopeMin <- subset(DataTableSlopeMin,select=c("Date2","MinSlope"))
+```
+
+Left Join the Max's and Min's Slopes back into the Sum datatable #TODO = join then fill down and add code to classify based on slope
+```{r}
+DataTableSum2 <- left_join(DataTableSum,DataTableSlopeMin, by = "Date2")
+DataTableSum2 <-  left_join(DataTableSum2,DataTableSlopeMax, by = "Date2")
+DataTableSum2$MinSlope <- with(DataTableSum2, as.numeric(DataTableSum2$MinSlope))
+DataTableSum2$MaxSlope <- with(DataTableSum2, as.numeric(DataTableSum2$MaxSlope))
+
+#DataTableSum2 %>% fill(MinSlope,MaxSlope, .direction = "downup")
+#you have to have a leading or tail value for this to work
+```
+
+```{r}
+fillNAgaps <- function(x, firstBack=FALSE) {
+    ## NA's in a vector or factor are replaced with last non-NA values
+    ## If firstBack is TRUE, it will fill in leading NA's with the first
+    ## non-NA value. If FALSE, it will not change leading NA's.
+    ## Source: http://www.cookbook-r.com/Manipulating_data/Filling_in_NAs_with_last_non-NA_value/
+    # If it's a factor, store the level labels and convert to integer
+    lvls <- NULL
+    if (is.factor(x)) {
+        lvls <- levels(x)
+        x    <- as.integer(x)
+    }
+ 
+    goodIdx <- !is.na(x)
+ 
+    # These are the non-NA values from x only
+    # Add a leading NA or take the first good value, depending on firstBack   
+    if (firstBack)   goodVals <- c(x[goodIdx][1], x[goodIdx])
+    else             goodVals <- c(NA,            x[goodIdx])
+
+    # Fill the indices of the output vector with the indices pulled from
+    # these offsets of goodVals. Add 1 to avoid indexing to zero.
+    fillIdx <- cumsum(goodIdx)+1
+    
+    x <- goodVals[fillIdx]
+
+    # If it was originally a factor, convert it back
+    if (!is.null(lvls)) {
+        x <- factor(x, levels=seq_along(lvls), labels=lvls)
+    }
+
+    x
+}
+```
+
+Fill all the NS's with values
+```{r}
+# Fill the leading NA's with the first good value
+DataTableSum2$MaxSlope <- with(DataTableSum2,fillNAgaps(DataTableSum2$MaxSlope, firstBack=TRUE))
+DataTableSum2$MinSlope <- with(DataTableSum2,fillNAgaps(DataTableSum2$MinSlope, firstBack=TRUE))
+DataTableSum2$MaxSlopeLine <- with(DataTableSum2,(DataTableSum2$MaxSlope * DataTableSum2$Close2))# +  DataTableSum2$Close2)
+DataTableSum2$MinSlopeLine <- with(DataTableSum2,(DataTableSum2$MinSlope * DataTableSum2$Open2))# + DataTableSum2$Open2)
+
+#remove any other NA fileds in prep for training dataset
+columns <- c("EMA20","EMA50","EMA200","DCH35","DCL35","DCH15","DCL15","EMA20INOC","EMA20INHL","CPDMaxEMA20","CPDMinEMA20")
+DataTableSum2[columns][is.na(x[columns])] <- 0
+
+```
+
+See the Min Max Slope Lines:
+```{r}
+ggplot(DataTableSum2, aes(x=Date3)) +
+  geom_line(aes(y = MaxSlopeLine), color = "darkred")+
+  geom_line(aes(y = MinSlopeLine), color = "steelblue", linetype="twodash")+
+  #geom_line(aes(y = Center2), color = "green")#+
+  scale_x_date(limits = as.Date(c('2015-01-01','2019-12-31')))
+```
+
+Distributions of Max and Min Slope Lines to aid in determine Classification Grouping
+```{r}
+hist(DataTableSum2$MaxSlopeLine,breaks=100,xlim=c(-200,200))
+hist(DataTableSum2$MinSlopeLine,breaks=50,xlim=c(-200,200))
+```
+
+Classify based on min and max values
+```{r}
+DataTableSum2$TradingClass <- ifelse(DataTableSum2$MaxSlopeLine<= 5 & DataTableSum2$MinSlopeLine<= 5 & DataTableSum2$MaxSlopeLine>= -5 & DataTableSum2$MinSlopeLine>= -5,3,ifelse(DataTableSum2$MaxSlopeLine>= 15 & DataTableSum2$MinSlopeLine>= 15,4,ifelse(DataTableSum2$MaxSlopeLine>0 & DataTableSum2$MinSlopeLine> 0 & DataTableSum2$MaxSlopeLine < DataTableSum2$MinSlopeLine,1,ifelse(DataTableSum2$MaxSlopeLine<0 & DataTableSum2$MinSlopeLine< 0 & DataTableSum2$MaxSlopeLine < DataTableSum2$MinSlopeLine,2,6))))
+
+DataTableSum2$TradingClassBinary <- ifelse(DataTableSum2$MaxSlopeLine<= 5 & DataTableSum2$MinSlopeLine<= 5 & DataTableSum2$MaxSlopeLine>= -5 & DataTableSum2$MinSlopeLine>= -5,1,ifelse(DataTableSum2$MaxSlopeLine>= 15 & DataTableSum2$MinSlopeLine>= 15,1,ifelse(DataTableSum2$MaxSlopeLine>0 & DataTableSum2$MinSlopeLine> 0 & DataTableSum2$MaxSlopeLine < DataTableSum2$MinSlopeLine,1,ifelse(DataTableSum2$MaxSlopeLine<0 & DataTableSum2$MinSlopeLine< 0 & DataTableSum2$MaxSlopeLine < DataTableSum2$MinSlopeLine,1,0))))
+```
+
+Convert Trading Class to Text
+```{r}
+#DataTableSum2$TradingClassText <- ifelse(DataTableSum2$TradingClass == 1,"Increasing Megaphone",ifelse(DataTableSum2$TradingClass == 2,"Decreasing Megaphone",ifelse(DataTableSum2$TradingClass == 3,"Parallel Bars",ifelse(DataTableSum2$TradingClass == 4,"Increasing Parallel",ifelse(DataTableSum2$TradingClass == 5,"Decreasing Parallel","UnClassified")))))
+
+```
+Export data for additional analysis:
+```{r}
+library(writexl)
+library(WriteXLS)
+library(readxl)
+WriteXLS(DataTableSum2, "FINALMDS556.xlsx")
+
+# read it back
+out <- read_xlsx("FINALMDS556.xlsx")
+```
+
+Apply GMM Clustering
+```{r}
+#tbd
+```
+
+Apply Random Forest
+```{r}
+library(randomForest)
+
+#separate into training and test datasets
+#minimum <- min(subTrain$YearWeekNo)
+#maximum <- max(subTrain$YearWeekNo)
+Train <- subset(DataTableSum2,(DataTableSum2$YearWeekNo<201901))
+Test <- subset(DataTableSum2,(DataTableSum2$YearWeekNo>=201901))
+Train <- Train[-1,]
+
+removeme <- nrow(Test)
+#removeme
+Test <- Test[-removeme,]
+
+#drops <- c("TradingClassText")
+#Train[ , !(names(Train) %in% drops)]
+#Test[ , !(names(Test) %in% drops)]
+
+#set up columns and variables to test
+Vars <- setdiff(colnames(DataTableSum2),list('rgroup','TradingClass'))
+Formula <- as.formula(paste('TradingClass=="TradingClass"',
+  paste(Vars,collapse=' + '),sep=' ~ '))
+Formula
+
+#tell RF to run as classification instead of regression
+Train$TradingClass <- as.character(Train$TradingClass)
+Train$TradingClass <- as.factor(Train$TradingClass)
+
+#set up model
+fmodel <- randomForest(x=Train[,Vars],
+y=Train$TradingClass,
+ntree=100,
+nodesize=7,
+importance=T)
+```
+
+results of the model predictions:
+```{r}
+table(predict(fmodel), Train$TradingClass)
+```
+
+```{r}
+Pred = predict(fmodel, newdata=Test)
+CM = table(Pred, Test$TradingClass)
+CM
+```
+
+Models predictive accuracy on the Test data:
+```{r}
+accuracy4 = (sum(CM[4,1]))/sum(CM)
+accuracy4
+accuracy6 = (sum(CM[5,2]))/sum(CM)
+accuracy6
+```
+
+summary of the model's performance
+```{r}
+fmodel
+```
+
+Plot the fmodel:
+```{r}
+plot(fmodel)
+```
+
+Model Quality:
+```{r}
+plot(margin(fmodel, Train$TradingClass))
+```
+
+Importance top 15 columns:
+```{r}
+varImp <- importance(fmodel)
+varImp[1:15, ]
+```
+
+Plot the variable importance as measured by accuracy change.
+```{r}
+varImpPlot(fmodel, type=1)
+```
+
+Sort the variables by their importance, as measured by accuracy change.
+```{r}
+selVars <- names(sort(varImp[,1], decreasing=T))[1:25]
+```
+
+Build a random forest model using only the 25 most important variables.
+```{r}
+fsel <- randomForest(x=Train[,selVars],y=Train$TradingClass,
+ntree=100,
+nodesize=7,
+importance=T)
+```
+
+Results of the new model on the Training Data:
+```{r}
+table(predict(fsel), Train$TradingClass)
+```
+
+summary of the new model's performance
+```{r}
+fsel
+```
+
+Plot the RF:
+```{r}
+plot(fsel)
+```
+
+Plot the margin:
+```{r}
+plot(margin(fsel, Train$TradingClass))
+```
+
+Use the trained model to predict the outcome of the Test dataset:
+```{r}
+Pred = predict(fsel, newdata=Test)
+CM2 = table(Pred, Test$TradingClass)
+CM2
+```
+
+Improvement of the model using top 25 fields:
+```{r}
+accuracy4.2 = (sum(CM2[4,1]))/sum(CM2)
+accuracy4.2
+accuracy6.2 = (sum(CM2[5,2]))/sum(CM2)
+accuracy6.2
+```
+
+Old model accuracy to compare with above:
+```{r}
+accuracy4
+accuracy6
+```
+

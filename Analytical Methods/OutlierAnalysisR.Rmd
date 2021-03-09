@@ -1,0 +1,32 @@
+---
+title: "R Linear Regression"
+output: html_notebook
+source: https://www.youtube.com/watch?v=BsaV6hjWZ-4
+---
+```{r}
+data(trees)
+```
+
+```{r}
+r = lm(Volume~Height + Girth, trees)
+plot(r)
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(r)
+```
+
+```{r}
+data.frame(cooks.distance(r))
+```
+
+```{r}
+window(r)
+with(trees, plot(Girth, cooks.distance(r)))
+```
+
+```{r}
+identify(trees$Girth,cooks.distance(r))
+```
+

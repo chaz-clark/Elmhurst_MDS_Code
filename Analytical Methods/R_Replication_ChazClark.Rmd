@@ -1,0 +1,289 @@
+---
+title: "R Replication Examples 9.1-9.9 LM vs GAM"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+Download and load the data:
+```{r}
+library(RCurl)
+library(bitops)
+#download.file("https://raw.githubusercontent.com/WinVector/zmPDSwR/master/Spambase/spamD.tsv",destfile="spamD.tsv",method="libcurl")
+url = "https://raw.githubusercontent.com/WinVector/zmPDSwR/master/Spambase/spamD.tsv"
+#x = read.tsv(file=url)
+spamD = read.delim(file = url, header=TRUE, allowEscapes=FALSE, sep="\t",  quote="", na.strings="", comment.char="")
+```
+
+Listing 9.1 Preparing Spambase data and evaluating the performance of decision trees
+#____________________________________________________________________________________
+
+Splitting the Data in to Train and Test:
+```{r}
+spamTrain <- subset(spamD,spamD$rgroup>=10)
+spamTest <- subset(spamD,spamD$rgroup<10)
+```
+
+Use all the features and do binary classification, where TRUE corresponds to spam documents.
+```{r}
+spamVars <- setdiff(colnames(spamD),list('rgroup','spam'))
+spamFormula <- as.formula(paste('spam=="spam"',
+paste(spamVars,collapse=' + '),sep=' ~ '))
+```
+
+A function to calculate log likelihood (for calculating deviance).
+```{r}
+loglikelihood <- function(y, py) { 
+  pysmooth <- ifelse(py==0, 1e-12,
+              ifelse(py==1, 1-1e-12, py))
+  sum(y * log(pysmooth) + (1-y)*log(1 - pysmooth))
+}
+```
+
+A function to calculate and return various measures on the model: normalized deviance, prediction accuracy, and f1, which is the product of precision and recall.
+
+Convert the class probability estimator into a classifier by labeling documents that score greater than 0.5 as spam.
+```{r}
+accuracyMeasures <- function(pred, truth, name="model") {
+dev.norm <- -2*loglikelihood(as.numeric(truth), pred)/length(pred)
+ctable <- table(truth=truth,
+pred=(pred>0.5))
+accuracy <- sum(diag(ctable))/sum(ctable)
+precision <- ctable[2,2]/sum(ctable[,2])
+recall <- ctable[2,2]/sum(ctable[2,])
+f1 <- precision*recall
+data.frame(model=name, accuracy=accuracy, f1=f1, dev.norm)
+}
+```
+
+Load the rpart library and fit a decision tree model.
+```{r}
+library(rpart)
+treemodel <- rpart(spamFormula, spamTrain)
+```
+
+Evaluate the decision tree model against the training and test sets.
+```{r}
+accuracyMeasures(predict(treemodel, newdata=spamTrain),
+spamTrain$spam=="spam",
+name="tree, training")
+accuracyMeasures(predict(treemodel, newdata=spamTest),
+spamTest$spam=="spam",
+name="tree, test")
+```
+
+Listing 9.2 Bagging decision trees
+#__________________________________
+
+Use bootstrap samples the same size as the training set, with 100 trees.
+```{r}
+ntrain <- dim(spamTrain)[1]
+n <- ntrain
+ntree <- 100
+```
+
+Build the bootstrap samples by sampling the row indices of spamTrain with replacement. Each column of the matrix samples represents the row indices into spamTrain that comprise the bootstrap sample.
+```{r}
+samples <- sapply(1:ntree,
+FUN = function(iter)
+{sample(1:ntrain, size=n, replace=T)})
+```
+
+Train the individual decision trees and return them in a list. Note: this step can take a few minutes.
+```{r}
+treelist <-lapply(1:ntree,
+FUN=function(iter)
+{samp <- samples[,iter];
+rpart(spamFormula, spamTrain[samp,])})
+```
+
+predict.bag assumes the underlying classifier returns decision probabilities, not decisions.
+```{r}
+predict.bag <- function(treelist, newdata) {
+preds <- sapply(1:length(treelist),
+FUN=function(iter) {
+predict(treelist[[iter]], newdata=newdata)})
+predsums <- rowSums(preds)
+predsums/length(treelist)
+}
+```
+
+Evaluate the bagged decision trees against the training and test sets.
+```{r}
+accuracyMeasures(predict.bag(treelist, newdata=spamTrain),
+spamTrain$spam=="spam",
+name="bagging, training")
+```
+
+Results:
+```{r}
+accuracyMeasures(predict.bag(treelist, newdata=spamTest),
+spamTest$spam=="spam",
+name="bagging, test")
+```
+
+Listing 9.3 Using random forests
+#_______________________________
+
+Call the randomForest() function to build the model with explanatory variables as x and the category to be predicted as y.
+```{r}
+library(randomForest)
+set.seed(5123512)
+fmodel <- randomForest(x=spamTrain[,spamVars],
+y=spamTrain$spam,
+ntree=100,
+nodesize=7,
+importance=T)
+```
+
+Report the model quality.
+```{r}
+accuracyMeasures(predict(fmodel,
+newdata=spamTrain[,spamVars],type='prob')[,'spam'],
+spamTrain$spam=="spam",name="random forest, train")
+## model accuracy f1 dev.norm
+## 1 random forest, train 0.9884142 0.9706611 0.1428786
+accuracyMeasures(predict(fmodel,
+newdata=spamTest[,spamVars],type='prob')[,'spam'],
+spamTest$spam=="spam",name="random forest, test")
+## model accuracy f1 dev.norm
+## 1 random forest, test 0.9541485 0.8845029 0.3972416
+```
+
+Let’s summarize the results for all three of the models we’ve looked at:
+# Performance on the training set
+#model accuracy f1 dev.norm
+#Tree 0.9104514 0.7809002 0.5618654
+#Bagging 0.9220372 0.8072953 0.4702707
+#Random Forest 0.9884142 0.9706611 0.1428786
+# Performance on the test set
+#model accuracy f1 dev.norm
+#Tree 0.8799127 0.7091151 0.6702857
+#Bagging 0.9061135 0.7646497 0.5282290
+#Random Forest 0.9541485 0.8845029 0.3972416
+# Performance change between training and test:
+# The decrease in accuracy and f1 in the test set
+# from training, and the increase in dev.norm
+# in the test set from training.
+# (So in every case, smaller is better)
+#model accuracy f1 dev.norm
+#Tree 0.03053870 0.07178505 -0.10842030
+#Bagging 0.01592363 0.04264557 -0.05795832
+#Random Forest 0.03426572 0.08615813 -0.254363
+
+Listing 9.4 randomForest variable importance()
+#_____________________________________________
+
+Call importance() on the spam model
+```{r}
+varImp <- importance(fmodel)
+varImp[1:10, ]
+```
+
+Plot the variable importance as measured by accuracy change.
+```{r}
+varImpPlot(fmodel, type=1)
+```
+
+Listing 9.5 Fitting with fewer variables
+#_______________________________________
+
+Sort the variables by their importance, as measured by accuracy change.
+```{r}
+selVars <- names(sort(varImp[,1], decreasing=T))[1:25]
+```
+
+Build a random forest model using only the 25 most important variables.
+```{r}
+fsel <- randomForest(x=spamTrain[,selVars],y=spamTrain$spam,
+ntree=100,
+nodesize=7,
+importance=T)
+```
+
+```{r}
+accuracyMeasures(predict(fsel,
+newdata=spamTrain[,selVars],type='prob')[,'spam'],
+spamTrain$spam=="spam",name="RF small, train")
+## model accuracy f1 dev.norm
+## 1 RF small, train 0.9876901 0.9688546 0.1506817
+```
+```{r}
+accuracyMeasures(predict(fsel,
+newdata=spamTest[,selVars],type='prob')[,'spam'],
+spamTest$spam=="spam",name="RF small, test")
+## model accuracy f1 dev.norm
+## 1 RF small, test 0.9497817 0.8738142 0.400825
+```
+
+Listing 9.6 Preparing an artificial problem
+#__________________________________________
+```{r}
+set.seed(602957)
+x <- rnorm(1000)
+noise <- rnorm(1000, sd=1.5)
+y <- 3*sin(2*x) + cos(0.75*x) - 1.5*(x^2 ) + noise
+select <- runif(1000)
+frame <- data.frame(y=y, x = x)
+train <- frame[select > 0.1,]
+test <-frame[select <= 0.1,]
+```
+
+Listing 9.7 Linear regression applied to our artificial example
+#_______________________________________________________________
+```{r}
+lin.model <- lm(y ~ x, data=train)
+summary(lin.model)
+```
+
+```{r}
+#
+# calculate the root mean squared error (rmse)
+#
+resid.lin <- train$y-predict(lin.model)
+sqrt(mean(resid.lin^2))
+```
+
+Listing 9.8 GAM applied to our artificial example
+#_________________________________________________
+```{r}
+library(mgcv)
+glin.model <- gam(y~s(x), data=train)
+glin.model$converged
+
+summary(glin.model)
+
+```
+
+```{r}
+#
+# calculate the root mean squared error (rmse)
+#
+resid.glin <- train$y-predict(glin.model)
+sqrt(mean(resid.glin^2))
+```
+
+Listing 9.9 Comparing linear regression and GAM performance
+#__________________________________________________________
+
+```{r}
+actual <- test$y
+pred.lin <- predict(lin.model, newdata=test)
+pred.glin <- predict(glin.model, newdata=test)
+resid.lin <- actual-pred.lin
+resid.glin <- actual-pred.glin
+```
+
+Compare the RMSE of the linear model and the GAM on the test data.
+```{r}
+sqrt(mean(resid.lin^2))
+sqrt(mean(resid.glin^2))
+```
+
+Compare the R-squared of the linear model and the GAM on test data.
+```{r}
+cor(actual, pred.lin)^2
+cor(actual, pred.glin)^2
+```

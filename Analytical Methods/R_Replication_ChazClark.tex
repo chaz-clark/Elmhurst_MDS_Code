@@ -1,0 +1,708 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\hypersetup{unicode=true,
+            pdftitle={R Replication Examples 9.1-9.9 LM vs GAM},
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+%%% Use protect on footnotes to avoid problems with footnotes in titles
+\let\rmarkdownfootnote\footnote%
+\def\footnote{\protect\rmarkdownfootnote}
+
+%%% Change title format to be more compact
+\usepackage{titling}
+
+% Create subtitle command for use in maketitle
+\providecommand{\subtitle}[1]{
+  \posttitle{
+    \begin{center}\large#1\end{center}
+    }
+}
+
+\setlength{\droptitle}{-2em}
+
+  \title{R Replication Examples 9.1-9.9 LM vs GAM}
+    \pretitle{\vspace{\droptitle}\centering\huge}
+  \posttitle{\par}
+    \author{}
+    \preauthor{}\postauthor{}
+    \date{}
+    \predate{}\postdate{}
+  
+
+\begin{document}
+\maketitle
+
+Download and load the data:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(RCurl)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: bitops
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(bitops)}
+\CommentTok{#download.file("https://raw.githubusercontent.com/WinVector/zmPDSwR/master/Spambase/spamD.tsv",destfile="spamD.tsv",method="libcurl")}
+\NormalTok{url =}\StringTok{ "https://raw.githubusercontent.com/WinVector/zmPDSwR/master/Spambase/spamD.tsv"}
+\CommentTok{#x = read.tsv(file=url)}
+\NormalTok{spamD =}\StringTok{ }\KeywordTok{read.delim}\NormalTok{(}\DataTypeTok{file =}\NormalTok{ url, }\DataTypeTok{header=}\OtherTok{TRUE}\NormalTok{, }\DataTypeTok{allowEscapes=}\OtherTok{FALSE}\NormalTok{, }\DataTypeTok{sep=}\StringTok{"}\CharTok{\textbackslash{}t}\StringTok{"}\NormalTok{,  }\DataTypeTok{quote=}\StringTok{""}\NormalTok{, }\DataTypeTok{na.strings=}\StringTok{""}\NormalTok{, }\DataTypeTok{comment.char=}\StringTok{""}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+Listing 9.1 Preparing Spambase data and evaluating the performance of
+decision trees
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Splitting the Data in to Train and Test:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{spamTrain <-}\StringTok{ }\KeywordTok{subset}\NormalTok{(spamD,spamD}\OperatorTok{$}\NormalTok{rgroup}\OperatorTok{>=}\DecValTok{10}\NormalTok{)}
+\NormalTok{spamTest <-}\StringTok{ }\KeywordTok{subset}\NormalTok{(spamD,spamD}\OperatorTok{$}\NormalTok{rgroup}\OperatorTok{<}\DecValTok{10}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+Use all the features and do binary classification, where TRUE
+corresponds to spam documents.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{spamVars <-}\StringTok{ }\KeywordTok{setdiff}\NormalTok{(}\KeywordTok{colnames}\NormalTok{(spamD),}\KeywordTok{list}\NormalTok{(}\StringTok{'rgroup'}\NormalTok{,}\StringTok{'spam'}\NormalTok{))}
+\NormalTok{spamFormula <-}\StringTok{ }\KeywordTok{as.formula}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\StringTok{'spam=="spam"'}\NormalTok{,}
+\KeywordTok{paste}\NormalTok{(spamVars,}\DataTypeTok{collapse=}\StringTok{' + '}\NormalTok{),}\DataTypeTok{sep=}\StringTok{' ~ '}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+A function to calculate log likelihood (for calculating deviance).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{loglikelihood <-}\StringTok{ }\ControlFlowTok{function}\NormalTok{(y, py) \{ }
+\NormalTok{  pysmooth <-}\StringTok{ }\KeywordTok{ifelse}\NormalTok{(py}\OperatorTok{==}\DecValTok{0}\NormalTok{, }\FloatTok{1e-12}\NormalTok{,}
+              \KeywordTok{ifelse}\NormalTok{(py}\OperatorTok{==}\DecValTok{1}\NormalTok{, }\DecValTok{1}\FloatTok{-1e-12}\NormalTok{, py))}
+  \KeywordTok{sum}\NormalTok{(y }\OperatorTok{*}\StringTok{ }\KeywordTok{log}\NormalTok{(pysmooth) }\OperatorTok{+}\StringTok{ }\NormalTok{(}\DecValTok{1}\OperatorTok{-}\NormalTok{y)}\OperatorTok{*}\KeywordTok{log}\NormalTok{(}\DecValTok{1} \OperatorTok{-}\StringTok{ }\NormalTok{pysmooth))}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+A function to calculate and return various measures on the model:
+normalized deviance, prediction accuracy, and f1, which is the product
+of precision and recall.
+
+Convert the class probability estimator into a classifier by labeling
+documents that score greater than 0.5 as spam.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{accuracyMeasures <-}\StringTok{ }\ControlFlowTok{function}\NormalTok{(pred, truth, }\DataTypeTok{name=}\StringTok{"model"}\NormalTok{) \{}
+\NormalTok{dev.norm <-}\StringTok{ }\DecValTok{-2}\OperatorTok{*}\KeywordTok{loglikelihood}\NormalTok{(}\KeywordTok{as.numeric}\NormalTok{(truth), pred)}\OperatorTok{/}\KeywordTok{length}\NormalTok{(pred)}
+\NormalTok{ctable <-}\StringTok{ }\KeywordTok{table}\NormalTok{(}\DataTypeTok{truth=}\NormalTok{truth,}
+\DataTypeTok{pred=}\NormalTok{(pred}\OperatorTok{>}\FloatTok{0.5}\NormalTok{))}
+\NormalTok{accuracy <-}\StringTok{ }\KeywordTok{sum}\NormalTok{(}\KeywordTok{diag}\NormalTok{(ctable))}\OperatorTok{/}\KeywordTok{sum}\NormalTok{(ctable)}
+\NormalTok{precision <-}\StringTok{ }\NormalTok{ctable[}\DecValTok{2}\NormalTok{,}\DecValTok{2}\NormalTok{]}\OperatorTok{/}\KeywordTok{sum}\NormalTok{(ctable[,}\DecValTok{2}\NormalTok{])}
+\NormalTok{recall <-}\StringTok{ }\NormalTok{ctable[}\DecValTok{2}\NormalTok{,}\DecValTok{2}\NormalTok{]}\OperatorTok{/}\KeywordTok{sum}\NormalTok{(ctable[}\DecValTok{2}\NormalTok{,])}
+\NormalTok{f1 <-}\StringTok{ }\NormalTok{precision}\OperatorTok{*}\NormalTok{recall}
+\KeywordTok{data.frame}\NormalTok{(}\DataTypeTok{model=}\NormalTok{name, }\DataTypeTok{accuracy=}\NormalTok{accuracy, }\DataTypeTok{f1=}\NormalTok{f1, dev.norm)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Load the rpart library and fit a decision tree model.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(rpart)}
+\NormalTok{treemodel <-}\StringTok{ }\KeywordTok{rpart}\NormalTok{(spamFormula, spamTrain)}
+\end{Highlighting}
+\end{Shaded}
+
+Evaluate the decision tree model against the training and test sets.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{accuracyMeasures}\NormalTok{(}\KeywordTok{predict}\NormalTok{(treemodel, }\DataTypeTok{newdata=}\NormalTok{spamTrain),}
+\NormalTok{spamTrain}\OperatorTok{$}\NormalTok{spam}\OperatorTok{==}\StringTok{"spam"}\NormalTok{,}
+\DataTypeTok{name=}\StringTok{"tree, training"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##            model  accuracy        f1  dev.norm
+## 1 tree, training 0.9104514 0.7809002 0.5618654
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{accuracyMeasures}\NormalTok{(}\KeywordTok{predict}\NormalTok{(treemodel, }\DataTypeTok{newdata=}\NormalTok{spamTest),}
+\NormalTok{spamTest}\OperatorTok{$}\NormalTok{spam}\OperatorTok{==}\StringTok{"spam"}\NormalTok{,}
+\DataTypeTok{name=}\StringTok{"tree, test"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##        model  accuracy        f1  dev.norm
+## 1 tree, test 0.8799127 0.7091151 0.6702857
+\end{verbatim}
+
+Listing 9.2 Bagging decision trees
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Use bootstrap samples the same size as the training set, with 100 trees.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ntrain <-}\StringTok{ }\KeywordTok{dim}\NormalTok{(spamTrain)[}\DecValTok{1}\NormalTok{]}
+\NormalTok{n <-}\StringTok{ }\NormalTok{ntrain}
+\NormalTok{ntree <-}\StringTok{ }\DecValTok{100}
+\end{Highlighting}
+\end{Shaded}
+
+Build the bootstrap samples by sampling the row indices of spamTrain
+with replacement. Each column of the matrix samples represents the row
+indices into spamTrain that comprise the bootstrap sample.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{samples <-}\StringTok{ }\KeywordTok{sapply}\NormalTok{(}\DecValTok{1}\OperatorTok{:}\NormalTok{ntree,}
+\DataTypeTok{FUN =} \ControlFlowTok{function}\NormalTok{(iter)}
+\NormalTok{\{}\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\OperatorTok{:}\NormalTok{ntrain, }\DataTypeTok{size=}\NormalTok{n, }\DataTypeTok{replace=}\NormalTok{T)\})}
+\end{Highlighting}
+\end{Shaded}
+
+Train the individual decision trees and return them in a list. Note:
+this step can take a few minutes.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{treelist <-}\KeywordTok{lapply}\NormalTok{(}\DecValTok{1}\OperatorTok{:}\NormalTok{ntree,}
+\DataTypeTok{FUN=}\ControlFlowTok{function}\NormalTok{(iter)}
+\NormalTok{\{samp <-}\StringTok{ }\NormalTok{samples[,iter];}
+\KeywordTok{rpart}\NormalTok{(spamFormula, spamTrain[samp,])\})}
+\end{Highlighting}
+\end{Shaded}
+
+predict.bag assumes the underlying classifier returns decision
+probabilities, not decisions.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{predict.bag <-}\StringTok{ }\ControlFlowTok{function}\NormalTok{(treelist, newdata) \{}
+\NormalTok{preds <-}\StringTok{ }\KeywordTok{sapply}\NormalTok{(}\DecValTok{1}\OperatorTok{:}\KeywordTok{length}\NormalTok{(treelist),}
+\DataTypeTok{FUN=}\ControlFlowTok{function}\NormalTok{(iter) \{}
+\KeywordTok{predict}\NormalTok{(treelist[[iter]], }\DataTypeTok{newdata=}\NormalTok{newdata)\})}
+\NormalTok{predsums <-}\StringTok{ }\KeywordTok{rowSums}\NormalTok{(preds)}
+\NormalTok{predsums}\OperatorTok{/}\KeywordTok{length}\NormalTok{(treelist)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Evaluate the bagged decision trees against the training and test sets.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{accuracyMeasures}\NormalTok{(}\KeywordTok{predict.bag}\NormalTok{(treelist, }\DataTypeTok{newdata=}\NormalTok{spamTrain),}
+\NormalTok{spamTrain}\OperatorTok{$}\NormalTok{spam}\OperatorTok{==}\StringTok{"spam"}\NormalTok{,}
+\DataTypeTok{name=}\StringTok{"bagging, training"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##               model  accuracy        f1  dev.norm
+## 1 bagging, training 0.9222785 0.8080723 0.4716648
+\end{verbatim}
+
+Results:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{accuracyMeasures}\NormalTok{(}\KeywordTok{predict.bag}\NormalTok{(treelist, }\DataTypeTok{newdata=}\NormalTok{spamTest),}
+\NormalTok{spamTest}\OperatorTok{$}\NormalTok{spam}\OperatorTok{==}\StringTok{"spam"}\NormalTok{,}
+\DataTypeTok{name=}\StringTok{"bagging, test"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##           model  accuracy      f1  dev.norm
+## 1 bagging, test 0.9126638 0.78125 0.5310862
+\end{verbatim}
+
+Listing 9.3 Using random forests
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Call the randomForest() function to build the model with explanatory
+variables as x and the category to be predicted as y.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(randomForest)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## randomForest 4.6-14
+\end{verbatim}
+
+\begin{verbatim}
+## Type rfNews() to see new features/changes/bug fixes.
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{set.seed}\NormalTok{(}\DecValTok{5123512}\NormalTok{)}
+\NormalTok{fmodel <-}\StringTok{ }\KeywordTok{randomForest}\NormalTok{(}\DataTypeTok{x=}\NormalTok{spamTrain[,spamVars],}
+\DataTypeTok{y=}\NormalTok{spamTrain}\OperatorTok{$}\NormalTok{spam,}
+\DataTypeTok{ntree=}\DecValTok{100}\NormalTok{,}
+\DataTypeTok{nodesize=}\DecValTok{7}\NormalTok{,}
+\DataTypeTok{importance=}\NormalTok{T)}
+\end{Highlighting}
+\end{Shaded}
+
+Report the model quality.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{accuracyMeasures}\NormalTok{(}\KeywordTok{predict}\NormalTok{(fmodel,}
+\DataTypeTok{newdata=}\NormalTok{spamTrain[,spamVars],}\DataTypeTok{type=}\StringTok{'prob'}\NormalTok{)[,}\StringTok{'spam'}\NormalTok{],}
+\NormalTok{spamTrain}\OperatorTok{$}\NormalTok{spam}\OperatorTok{==}\StringTok{"spam"}\NormalTok{,}\DataTypeTok{name=}\StringTok{"random forest, train"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                  model  accuracy        f1  dev.norm
+## 1 random forest, train 0.9884142 0.9706611 0.1439711
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{## model accuracy f1 dev.norm}
+\CommentTok{## 1 random forest, train 0.9884142 0.9706611 0.1428786}
+\KeywordTok{accuracyMeasures}\NormalTok{(}\KeywordTok{predict}\NormalTok{(fmodel,}
+\DataTypeTok{newdata=}\NormalTok{spamTest[,spamVars],}\DataTypeTok{type=}\StringTok{'prob'}\NormalTok{)[,}\StringTok{'spam'}\NormalTok{],}
+\NormalTok{spamTest}\OperatorTok{$}\NormalTok{spam}\OperatorTok{==}\StringTok{"spam"}\NormalTok{,}\DataTypeTok{name=}\StringTok{"random forest, test"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                 model  accuracy        f1 dev.norm
+## 1 random forest, test 0.9497817 0.8734057 0.301078
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{## model accuracy f1 dev.norm}
+\CommentTok{## 1 random forest, test 0.9541485 0.8845029 0.3972416}
+\end{Highlighting}
+\end{Shaded}
+
+Let's summarize the results for all three of the models we've looked at:
+\# Performance on the training set \#model accuracy f1 dev.norm \#Tree
+0.9104514 0.7809002 0.5618654 \#Bagging 0.9220372 0.8072953 0.4702707
+\#Random Forest 0.9884142 0.9706611 0.1428786 \# Performance on the test
+set \#model accuracy f1 dev.norm \#Tree 0.8799127 0.7091151 0.6702857
+\#Bagging 0.9061135 0.7646497 0.5282290 \#Random Forest 0.9541485
+0.8845029 0.3972416 \# Performance change between training and test: \#
+The decrease in accuracy and f1 in the test set \# from training, and
+the increase in dev.norm \# in the test set from training. \# (So in
+every case, smaller is better) \#model accuracy f1 dev.norm \#Tree
+0.03053870 0.07178505 -0.10842030 \#Bagging 0.01592363 0.04264557
+-0.05795832 \#Random Forest 0.03426572 0.08615813 -0.254363
+
+Listing 9.4 randomForest variable importance()
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Call importance() on the spam model
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{varImp <-}\StringTok{ }\KeywordTok{importance}\NormalTok{(fmodel)}
+\NormalTok{varImp[}\DecValTok{1}\OperatorTok{:}\DecValTok{10}\NormalTok{, ]}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                     non-spam      spam MeanDecreaseAccuracy
+## word.freq.make      1.656795  3.432962             3.067899
+## word.freq.address   2.631231  3.800668             3.632077
+## word.freq.all       3.279517  6.235651             6.137927
+## word.freq.3d        3.900232  1.286917             3.753238
+## word.freq.our       9.966034 10.160010            12.039651
+## word.freq.over      4.657285  4.183888             4.894526
+## word.freq.remove   19.172764 14.020182            20.229958
+## word.freq.internet  7.595305  5.246213             8.036892
+## word.freq.order     3.167008  2.505777             3.065529
+## word.freq.mail      3.820764  2.786041             4.869502
+##                    MeanDecreaseGini
+## word.freq.make             8.131240
+## word.freq.address          9.971055
+## word.freq.all             27.744061
+## word.freq.3d               1.453879
+## word.freq.our             59.215337
+## word.freq.over            13.362416
+## word.freq.remove         158.008043
+## word.freq.internet        22.025964
+## word.freq.order            8.062485
+## word.freq.mail            11.605088
+\end{verbatim}
+
+Plot the variable importance as measured by accuracy change.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{varImpPlot}\NormalTok{(fmodel, }\DataTypeTok{type=}\DecValTok{1}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{R_Replication_ChazClark_files/figure-latex/unnamed-chunk-17-1.pdf}
+
+Listing 9.5 Fitting with fewer variables
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Sort the variables by their importance, as measured by accuracy change.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{selVars <-}\StringTok{ }\KeywordTok{names}\NormalTok{(}\KeywordTok{sort}\NormalTok{(varImp[,}\DecValTok{1}\NormalTok{], }\DataTypeTok{decreasing=}\NormalTok{T))[}\DecValTok{1}\OperatorTok{:}\DecValTok{25}\NormalTok{]}
+\end{Highlighting}
+\end{Shaded}
+
+Build a random forest model using only the 25 most important variables.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{fsel <-}\StringTok{ }\KeywordTok{randomForest}\NormalTok{(}\DataTypeTok{x=}\NormalTok{spamTrain[,selVars],}\DataTypeTok{y=}\NormalTok{spamTrain}\OperatorTok{$}\NormalTok{spam,}
+\DataTypeTok{ntree=}\DecValTok{100}\NormalTok{,}
+\DataTypeTok{nodesize=}\DecValTok{7}\NormalTok{,}
+\DataTypeTok{importance=}\NormalTok{T)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{accuracyMeasures}\NormalTok{(}\KeywordTok{predict}\NormalTok{(fsel,}
+\DataTypeTok{newdata=}\NormalTok{spamTrain[,selVars],}\DataTypeTok{type=}\StringTok{'prob'}\NormalTok{)[,}\StringTok{'spam'}\NormalTok{],}
+\NormalTok{spamTrain}\OperatorTok{$}\NormalTok{spam}\OperatorTok{==}\StringTok{"spam"}\NormalTok{,}\DataTypeTok{name=}\StringTok{"RF small, train"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##             model  accuracy        f1  dev.norm
+## 1 RF small, train 0.9862419 0.9651595 0.1382523
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{## model accuracy f1 dev.norm}
+\CommentTok{## 1 RF small, train 0.9876901 0.9688546 0.1506817}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{accuracyMeasures}\NormalTok{(}\KeywordTok{predict}\NormalTok{(fsel,}
+\DataTypeTok{newdata=}\NormalTok{spamTest[,selVars],}\DataTypeTok{type=}\StringTok{'prob'}\NormalTok{)[,}\StringTok{'spam'}\NormalTok{],}
+\NormalTok{spamTest}\OperatorTok{$}\NormalTok{spam}\OperatorTok{==}\StringTok{"spam"}\NormalTok{,}\DataTypeTok{name=}\StringTok{"RF small, test"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##            model  accuracy        f1  dev.norm
+## 1 RF small, test 0.9585153 0.8956005 0.4963935
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{## model accuracy f1 dev.norm}
+\CommentTok{## 1 RF small, test 0.9497817 0.8738142 0.400825}
+\end{Highlighting}
+\end{Shaded}
+
+Listing 9.6 Preparing an artificial problem
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{set.seed}\NormalTok{(}\DecValTok{602957}\NormalTok{)}
+\NormalTok{x <-}\StringTok{ }\KeywordTok{rnorm}\NormalTok{(}\DecValTok{1000}\NormalTok{)}
+\NormalTok{noise <-}\StringTok{ }\KeywordTok{rnorm}\NormalTok{(}\DecValTok{1000}\NormalTok{, }\DataTypeTok{sd=}\FloatTok{1.5}\NormalTok{)}
+\NormalTok{y <-}\StringTok{ }\DecValTok{3}\OperatorTok{*}\KeywordTok{sin}\NormalTok{(}\DecValTok{2}\OperatorTok{*}\NormalTok{x) }\OperatorTok{+}\StringTok{ }\KeywordTok{cos}\NormalTok{(}\FloatTok{0.75}\OperatorTok{*}\NormalTok{x) }\OperatorTok{-}\StringTok{ }\FloatTok{1.5}\OperatorTok{*}\NormalTok{(x}\OperatorTok{^}\DecValTok{2}\NormalTok{ ) }\OperatorTok{+}\StringTok{ }\NormalTok{noise}
+\NormalTok{select <-}\StringTok{ }\KeywordTok{runif}\NormalTok{(}\DecValTok{1000}\NormalTok{)}
+\NormalTok{frame <-}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(}\DataTypeTok{y=}\NormalTok{y, }\DataTypeTok{x =}\NormalTok{ x)}
+\NormalTok{train <-}\StringTok{ }\NormalTok{frame[select }\OperatorTok{>}\StringTok{ }\FloatTok{0.1}\NormalTok{,]}
+\NormalTok{test <-frame[select }\OperatorTok{<=}\StringTok{ }\FloatTok{0.1}\NormalTok{,]}
+\end{Highlighting}
+\end{Shaded}
+
+Listing 9.7 Linear regression applied to our artificial example
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{lin.model <-}\StringTok{ }\KeywordTok{lm}\NormalTok{(y }\OperatorTok{~}\StringTok{ }\NormalTok{x, }\DataTypeTok{data=}\NormalTok{train)}
+\KeywordTok{summary}\NormalTok{(lin.model)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Call:
+## lm(formula = y ~ x, data = train)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -17.698  -1.774   0.193   2.499   7.529 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)  -0.8330     0.1161  -7.175 1.51e-12 ***
+## x             0.7395     0.1197   6.180 9.74e-10 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 3.485 on 899 degrees of freedom
+## Multiple R-squared:  0.04075,    Adjusted R-squared:  0.03968 
+## F-statistic: 38.19 on 1 and 899 DF,  p-value: 9.737e-10
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{#}
+\CommentTok{# calculate the root mean squared error (rmse)}
+\CommentTok{#}
+\NormalTok{resid.lin <-}\StringTok{ }\NormalTok{train}\OperatorTok{$}\NormalTok{y}\OperatorTok{-}\KeywordTok{predict}\NormalTok{(lin.model)}
+\KeywordTok{sqrt}\NormalTok{(}\KeywordTok{mean}\NormalTok{(resid.lin}\OperatorTok{^}\DecValTok{2}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 3.481091
+\end{verbatim}
+
+Listing 9.8 GAM applied to our artificial example
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(mgcv)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: nlme
+\end{verbatim}
+
+\begin{verbatim}
+## This is mgcv 1.8-29. For overview type 'help("mgcv-package")'.
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{glin.model <-}\StringTok{ }\KeywordTok{gam}\NormalTok{(y}\OperatorTok{~}\KeywordTok{s}\NormalTok{(x), }\DataTypeTok{data=}\NormalTok{train)}
+\NormalTok{glin.model}\OperatorTok{$}\NormalTok{converged}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] TRUE
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{summary}\NormalTok{(glin.model)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Family: gaussian 
+## Link function: identity 
+## 
+## Formula:
+## y ~ s(x)
+## 
+## Parametric coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept) -0.83467    0.04852   -17.2   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##        edf Ref.df     F p-value    
+## s(x) 8.685  8.972 497.4  <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## R-sq.(adj) =  0.832   Deviance explained = 83.4%
+## GCV =  2.144  Scale est. = 2.121     n = 901
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{#}
+\CommentTok{# calculate the root mean squared error (rmse)}
+\CommentTok{#}
+\NormalTok{resid.glin <-}\StringTok{ }\NormalTok{train}\OperatorTok{$}\NormalTok{y}\OperatorTok{-}\KeywordTok{predict}\NormalTok{(glin.model)}
+\KeywordTok{sqrt}\NormalTok{(}\KeywordTok{mean}\NormalTok{(resid.glin}\OperatorTok{^}\DecValTok{2}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 1.448514
+\end{verbatim}
+
+Listing 9.9 Comparing linear regression and GAM performance
+\#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{actual <-}\StringTok{ }\NormalTok{test}\OperatorTok{$}\NormalTok{y}
+\NormalTok{pred.lin <-}\StringTok{ }\KeywordTok{predict}\NormalTok{(lin.model, }\DataTypeTok{newdata=}\NormalTok{test)}
+\NormalTok{pred.glin <-}\StringTok{ }\KeywordTok{predict}\NormalTok{(glin.model, }\DataTypeTok{newdata=}\NormalTok{test)}
+\NormalTok{resid.lin <-}\StringTok{ }\NormalTok{actual}\OperatorTok{-}\NormalTok{pred.lin}
+\NormalTok{resid.glin <-}\StringTok{ }\NormalTok{actual}\OperatorTok{-}\NormalTok{pred.glin}
+\end{Highlighting}
+\end{Shaded}
+
+Compare the RMSE of the linear model and the GAM on the test data.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{sqrt}\NormalTok{(}\KeywordTok{mean}\NormalTok{(resid.lin}\OperatorTok{^}\DecValTok{2}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 2.792653
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{sqrt}\NormalTok{(}\KeywordTok{mean}\NormalTok{(resid.glin}\OperatorTok{^}\DecValTok{2}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 1.401399
+\end{verbatim}
+
+Compare the R-squared of the linear model and the GAM on test data.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{cor}\NormalTok{(actual, pred.lin)}\OperatorTok{^}\DecValTok{2}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 0.1543172
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{cor}\NormalTok{(actual, pred.glin)}\OperatorTok{^}\DecValTok{2}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 0.7828869
+\end{verbatim}
+
+
+\end{document}

@@ -1,0 +1,18 @@
+---
+title: "Grainger Causality"
+output: html_notebook
+name: Chaz Clark MDS 556 
+---
+
+```{r}
+library(lmtest)
+head(ChickEgg)
+plot.ts(ChickEgg)
+grangertest(chicken ~ egg, order =3, data=ChickEgg)
+grangertest(egg ~ chicken, order =3, data=ChickEgg)
+```
+Questions:
+Explore the data behind the chicken and egg question to see for yourself how some of the ideas in the article play out. Given what we've covered on correlations, do you see any potential issues?
+
+Answer:
+It is interesting that the Egg Granger Causes Chickents at a P value of 0.002966 this is significant where the Chicken Grainger Causes Eggs is only a P value of 0.6238 not significant. It definetly implies a one way directional correlaiton or Grainger Causation. I am not sure of "potnential issues" fully. Some thoughts are that people could interpret this the wrong way, or use it out of context. Its an easy path from Chickens come from eggs to eggs cause chickens, but we know by our breakfast omlet that not all eggs make it all the way to chicken. The opposite is true with the popularity of Chick-fil-A. 

@@ -1,0 +1,177 @@
+---
+title: "Week 6 - Time Series - Chaz Clark"
+output: html_notebook
+---
+
+Source:https://a-little-book-of-r-for-time-series.readthedocs.io/en/latest/src/timeseries.html
+
+loading a package in 
+```{r}
+library(TTR)
+library(quantmod)
+library(xts)
+```
+
+Other Resources:
+```{r}
+#
+#   TTR: Technical Trading Rules
+#
+#   Copyright (C) 2007-2013  Joshua M. Ulrich
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 2 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+"pivots" <-
+function(data, lagts=TRUE) {
+
+  # Author: Brian G. Peterson
+  # http://www.investopedia.com/articles/forex/05/FXpivots.asp
+  # http://www.investopedia.com/articles/technical/04/041404.asp
+
+  # CentralPivot Point (P) = (High + Low + Close) / 3
+  center <- xts(rowSums(HLC(data))/3,order.by=index(data))
+
+  R1 <- (2*center)-Lo(data)  # First Resistance (R1) = (2*P) - Low
+  S1 <- (2*center)-Hi(data)  # First Support (S1) = (2*P) - High
+  R2 <- center + (R1 - S1)   # Second Resistance (R2) = P + (R1-S1)
+  S2 <- center - (R1 - S1)   # Second Support (S2) = P - (R1- S1)
+  ret <- cbind(center,R1,R2,S1,S2)
+  colnames(ret) <- c('center','R1','R2','S1','S2')
+  if(lagts){
+    newrow <- xts(t(rep(NA,5)), order.by=last(index(data))+1)
+    ret <- rbind(ret,newrow)
+    ret <- lag.xts(ret)
+  }
+  return(ret)
+}
+
+```
+
+Pulling the Data from Online:
+```{r}
+options("getSymbols.warning4.0"=FALSE)
+getSymbols('SPY')
+#candleChart(SPY,subset='2011-12::2019', type='candles',TA="addBBands(n=20)")
+SPY <- SPY[,-1:-3]
+SPY <- SPY[,-2:-3]
+#SPY
+```
+
+```{r}
+SPY_SMA3 <- SMA(SPY,n=3)
+plot.ts(SPY_SMA3)
+```
+
+```{r}
+SPY_SMA8 <- SMA(SPY,n=8)
+plot.ts(SPY_SMA8)
+```
+To estimate the trend, seasonal and irregular components of this time series, we type:
+```{r}
+SPY_Mod <- ts(SPY,frequency = 4)
+SPY_decomp <- decompose(SPY_Mod)
+plot(SPY_decomp)
+```
+
+```{r}
+SPY_Decomp_SA <- SPY_Mod - SPY_decomp$seasonal
+plot(SPY_Decomp_SA)
+```
+
+```{r}
+SPY_forecasts <- HoltWinters(SPY, beta=FALSE, gamma=FALSE)
+SPY_forecasts
+```
+
+```{r}
+head(SPY_forecasts$fitted)
+```
+
+```{r}
+plot(SPY_forecasts)
+```
+
+```{r}
+SPY_forecasts$SSE
+```
+
+
+
+```{r}
+library(forecast)
+library(stats)
+```
+
+```{r}
+SPY_forecasts <- stats::HoltWinters(SPY, beta=FALSE, gamma=FALSE, l.start=141.37)
+```
+
+```{r}
+SPY_forecasts2 <- forecast:::forecast.HoltWinters(SPY_forecasts, h=8)
+SPY_forecasts2
+```
+
+```{r}
+forecast:::plot.forecast(SPY_forecasts2)
+```
+For example, to calculate a correlogram of the in-sample forecast errors for the London rainfall data for lags 1-20, we type:
+```{r}
+#head(SPY_forecasts2$residuals)
+#acf(SPY_forecasts2$residuals, lag.max=20)
+#couldnt get this to work but this does:
+acf(SPY_forecasts2)
+```
+
+```{r}
+Box.test(SPY_forecasts2$residuals, lag=20, type="Ljung-Box")
+```
+
+```{r}
+plot.ts(SPY_forecasts2$residuals)
+```
+
+```{r}
+plotForecastErrors <- function(forecasterrors)
+  {
+     # make a histogram of the forecast errors:
+     mybinsize <- IQR(forecasterrors)/4
+     mysd   <- sd(forecasterrors)
+     mymin  <- min(forecasterrors) - mysd*5
+     mymax  <- max(forecasterrors) + mysd*3
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     mynorm <- rnorm(10000, mean=0, sd=mysd)
+     mymin2 <- min(mynorm)
+     mymax2 <- max(mynorm)
+     if (mymin2 < mymin) { mymin <- mymin2 }
+     if (mymax2 > mymax) { mymax <- mymax2 }
+     # make a red histogram of the forecast errors, with the normally distributed data overlaid:
+     mybins <- seq(mymin, mymax, mybinsize)
+     hist(forecasterrors, col="red", freq=FALSE, breaks=mybins)
+     # freq=FALSE ensures the area under the histogram = 1
+     # generate normally distributed data with mean 0 and standard deviation mysd
+     myhist <- hist(mynorm, plot=FALSE, breaks=mybins)
+     # plot the normal curve as a blue line on top of the histogram of forecast errors:
+     points(myhist$mids, myhist$density, type="l", col="blue", lwd=2)
+  }
+```
+
+```{r}
+#columns <- c("residuals")
+#SPY_forecasts2[columns][is.na(x[columns])] <- 0
+SPY_forecasts2$residuals[1] <- 0
+#SPY_forecasts2$residuals
+plotForecastErrors(SPY_forecasts2$residuals)
+```
+

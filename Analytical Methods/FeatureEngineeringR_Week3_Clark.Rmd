@@ -1,0 +1,143 @@
+---
+title: "Feature Engineering using R"
+output: html_notebook
+name: Chaz Clark MDS 556 Week 3
+source: Feature Engineering using R
+https://techcommunity.microsoft.com/t5/SQL-Server/Feature-Engineering-using-R/ba-p/385286
+https://blogs.msdn.microsoft.com/microsoftrservertigerteam/2017/03/23/feature-engineering-using-r/
+---
+
+This will load all the available datsets built into R:
+```{r}
+#data()
+head(iris)
+head(mtcars)
+```
+
+Plot the Pearson Correlation:
+```{r}
+plot(mtcars$wt, mtcars$mpg, col="red", xlab = "Weight of the cars", ylab = "Miles per gallon", pch=16, main = "Pearson Correlation")
+```
+
+Requires Microsoft R Open:
+```{r}
+#form <- ~ wt + mpg + cyl
+#rxCor(form, data = mtcars)
+```
+
+Look at the correlation of the two fields:
+```{r}
+cor.test(x = mtcars$wt, y = mtcars$mpg)
+```
+
+Plot the pairs to view correlation:
+```{r}
+pairs(~mpg + disp + wt + cyl, data=mtcars, main="Scatterplot Matrix")
+```
+
+Look at the IG Values of the IRIS data:
+```{r}
+library(FSelectorRcpp)
+ig_values <- information_gain(Species ~ ., iris)
+cut_attrs(attrs = x)
+ig_values
+```
+
+```{r}
+# filter the top K features and use it to create the model formula
+top_k_features <- to_formula(cut_attrs(attrs = x), "Species")
+f <- cut_attrs(attrs = x, k = 2)
+f
+```
+
+Needs Microsoft R Server:
+```{r}
+#logistic_Mod <- rxLogisticRegression(Species ~ Petal.Width + Petal.Length + Sepal.Width + Sepal.Length, data = iris, l1Weight = 0, 
+#type = "multi", mlTransforms = list(selectFeatures(Species ~ Petal.Width + Petal.Length + Sepal.Width + Sepal.Length, mode = mutualInformation(numFeaturesToKeep = 2))))
+```
+
+Wrapper Method:
+```{r}
+library(caret)
+rfe_controller <- rfeControl(functions=lmFuncs, method="repeatedcv", repeats = 5, verbose = FALSE)
+size <- c(1:10) 
+lm_Profiler <- rfe(mtcars[,2:11], mtcars[,1], rfeControl = rfe_controller)
+lm_Profiler
+```
+
+```{r}
+plot(lm_Profiler)
+```
+
+Feature Extraction or Construction:
+```{r}
+range(CO2$conc)
+scaled_conc <- scale(CO2$conc)
+range(scaled_conc)
+```
+
+PCA:
+```{r}
+mtcars_feat <- mtcars[,2:11]
+mtcars_mpg <- mtcars[,1]
+mtcars_pca <- prcomp(x = mtcars_feat, scale. = T)
+# gives the standard deviation of all the PCAs.
+mtcars_pca$sdev
+```
+
+```{r}
+# List of PCAs generated for the mtcars dataset
+mtcars_pca
+```
+
+Needs Microsoft R Server:
+```{r}
+#Use Biplot to visualize the first two principal components:
+#biplot(mtcars.pca_model, scale = TRUE, pc.biplot = TRUE)
+```
+
+LDA: 
+```{r}
+#head(iris)
+#train <- sample(1:150, 75)
+#lda_model <- lda(Species ~., data = iris, subset=train)
+```
+
+```{r}
+# shows you the mean, used for LDA
+ #lda_model$means
+```
+
+```{r}
+#Predictions on the test data
+#lda_pred <- predict(object = lda_model, newdata = iris[-train, ])
+#lda_pred$class
+#iris_test <- iris[-train, ]
+#ggplot() + geom_point(aes(lda_pred$x[,1], lda_pred$x[,2], colour = iris_test$Species, shape = iris_test$Species), 
+#size = 2.5) + ggtitle("Linear Discriminant Analysis") + xlab("LDA1") + ylab("LDA2") + labs(fill = "Species")
+```
+
+package ‘MicrosoftML’ is not available (for R version 3.6.1)
+```{r}
+#library(MicrosoftML)
+#rf_model <- rxDForest(formula = form, data = mtcars, importance = TRUE )
+#rf_model$importance
+```
+```{r}
+#rf_model <- randomForest(mpg ~ ., data = mtcars, importance = TRUE)
+#rf_model$importance
+```
+
+Random Forest:
+```{r}
+# NOT RUN {
+library(randomForest)
+set.seed(4543)
+data(mtcars)
+mtcars.rf <- randomForest(mpg ~ ., data=mtcars, ntree=1000,
+                          keep.forest=FALSE, importance=TRUE)
+importance(mtcars.rf)
+importance(mtcars.rf, type=1)
+# }
+```
+
