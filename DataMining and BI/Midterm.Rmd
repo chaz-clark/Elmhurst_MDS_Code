@@ -1,0 +1,120 @@
+---
+title: "MDS534 Midterm - Chaz Clark"
+output: html_notebook
+---
+
+1. Data from Excel File expanded:
+Customer	Age	Salary	Item #1	Item #2	Item #3	Item #4	Item #5
+John Doe	30	50000	TV	BluRay			
+Jane Doe	29	55000	TV	X-BOX	iPAD	iPHONE	ZUNE
+Peter Rabbit	40	105000	Router	Modem	Ethernet	Apple TV	
+Blaze	35	130000	PS4	Games	Controller	TV	HDMI
+Chase	22	75000	Amazon TV	HDMI	Ethernet		
+Sky	60	30000	iPHONE	iPAD	ZUNE		
+Rocky	55	45000	Laptop	Printer			
+Everest	43	23000	TV	BluRay	HDMI		
+Marshal	74	55000	Games	Controller	Software		
+Rubble	38	47000	iPHONE	iPAD	AppleTV	MAC PRO	ZUNE
+Zuma	46	35000	HDMI	Ethernet						
+
+```{r}
+#import the data
+library(readr)
+Book1 <- read_csv("/Volumes/MacProHHD64MB/MovedUsers/ChazInkLLC/Documents/Documents - Mac Pro/Elmhurst/Data Mining/Midterm/Book1.csv")
+View(Book1)
+
+```
+
+```{r}
+#modify the data for use
+#transID <- cbind(1:11)
+
+items <- cbind(Book1$`Item #1`,Book1$`Item #2`,Book1$`Item #3`,Book1$`Item #4`,Book1$`Item #5`)
+items <- split(items,row(items))
+items
+
+#History of other data cleaning attempts:
+
+#na.omit(items)
+#items[!is.na(items)]
+#items <- as(Book1[,-1]>0, "transactions")
+
+# Clean up the missing values to be FALSE
+#items[is.na(items)] <- FALSE
+
+# Clean up names
+#colnames(items) <- gsub(x=colnames(items),pattern="const\\.", replacement=" ")
+
+#trans1<-c(items[1][length(items[1] != "")])
+
+#delete.NULLs  <-  function(x.list){   # delele null/empty entries in a list 
+#    x.list[unlist(lapply(x.list, length) != 0)] 
+#} 
+
+#delete.NULLs(items) 
+
+#items2 <- as(as.list(items),"transactions")
+#items2[lengths(items2) > 0 & items2 != ""]
+
+#items2 <- as(items,"transactions")
+#summary(items2)
+
+#summary(items)
+```
+
+```{r}
+# 2. 2.	Using the Apriori algorithm, find the frequent item sets in your data. Illustrate all your steps in the process
+
+library(arules)
+
+results <- apriori(items,parameter=list(supp=.1, conf=.9, target="rules"))
+summary(results)
+inspect(results)
+```
+
+ Results:
+      lhs               rhs           support   confidence lift       count
+[1]	  {BluRay}	    =>	{TV}	        0.1818182	1	          2.750000	2
+[2]	  {Games}	      =>	{Controller}	0.1818182	1	          5.500000	2
+[3]	  {Controller}	=>	{Games}	      0.1818182	1	          5.500000	2
+[4]	  {iPHONE}	    =>	{ZUNE}	      0.2727273	1	          3.666667	3
+[5]	  {ZUNE}	      =>	{iPHONE}    	0.2727273	1	          3.666667	3
+[6]	  {iPHONE}      =>	{iPAD}	      0.2727273	1	          3.666667	3
+[7]	  {iPAD}	      =>	{iPHONE}    	0.2727273	1	          3.666667	3
+[8]	  {ZUNE}	      =>	{iPAD}	      0.2727273	1	          3.666667	3
+[9]	  {iPAD}	      =>	{ZUNE}	      0.2727273	1	          3.666667	3
+[10]	{iPHONE,ZUNE}	=>	{iPAD}	      0.2727273	1	          3.666667	3
+[11]	{iPAD,iPHONE}	=>	{ZUNE}	      0.2727273	1	          3.666667	3
+[12]	{iPAD,ZUNE}	  =>	{iPHONE}    	0.2727273	1	          3.666667	3
+
+```{r}
+#3. calculate the mean, median $ standard dev. of Age and Salary
+age <- c(Book1$Age)
+salary <- c(Book1$Salary)
+
+print("Mean Age")
+mean(age)
+print("Median Age")
+median(age)
+print("Stand Dev Age")
+sd(age)
+
+print(" ")
+
+print("Mean Salary")
+mean(salary)
+print("Median Salary")
+median(salary)
+print("Stand Dev Salary")
+sd(salary)
+```
+
+4. How can Best Buy utilize the info from the analysis?
+  A. It may not be a huge suprise but Best Buy can use the info to understand their demographics of their cusotmers (ex. average age range 25-55, median salary of 50k). And they can also predict with a high level of confidence that these cusotmers will want the Apple products next to eachother and next to other similar electronics like the Zune. In addition to this it woudl be a smart move to place BlueRay Players next to the TVs. Adding additional discounts when purchasing some of these items together could increase their overall sales, and might be the tipping point the customer needs to decide to buy both right now instead of waiting and buying them separetly and thus potentially purchasing it elsewhere.
+  
+5. Compare and contrast Apriori vs. FP-Growth.
+ A. The APriori's downfall is its cost of resources for large datasets. It must read through the data each time it counts the for the items in the list. FP-Grwoth in contrast only has to read through the data twice in total, the first to map out the items and their relations and the second to confirm the counts. 
+ 
+ Where speed is a vital requirement and with data sets only growing in size it seems that Apriori is the underdog in a loosing fight. However as technology keeps improving and with recent anouncements by Google and BigQuery it is possible to query one column of data (multiple TB) in a minute or two. The Apriori technique woudl however have to be adapted for SQL vs R or Python, but the results could be mines relatively quickly. If Google figured it out with SQL, it is very possible that the speed limitation for Apriori will be lifted and it will eventually come out on top.
+ 
+ Other point to note is how FP-Growth uses a vector arrow method to establish the relationships as it finds them through the first scan of the data, where Apriori uses lists of arrays of data and is populated from singles, doubles, triples, etc. up to the max number of items in a single transaction. The devil is in the details, and this is where the devil of speed comes out that was discussed above.

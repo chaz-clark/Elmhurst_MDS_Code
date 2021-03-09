@@ -1,0 +1,51 @@
+---
+title: "Unit 3 HW Problems - Chaz Clark"
+output: html_notebook
+---
+
+3.2 In  real-world  data,  tuples  with missing  values for  some  attributes  are  a  common occurrence. Describe various methods for handling this problem.
+
+a. you can replace the missing data with a common value such as 0, Unknown, or Null. there are some basic problems with this especially if the end user is unaware of this replacement and seeks for additional info into the cluster of Unknown data when in fact there is no meaning to this category
+
+b. you can replace the missing data with either the mean, median, or mode depending on the data if it is skewed or not, and this method can be applied based on the centeral tendancy of the data, or by category thus assigning the mean, for example, for all misisng values for that specific category
+
+c. you can build a decision tree and fill in the data with the most probable value
+
+d. you can ignore the missing values
+
+3.6 Use these methods normalization following group of data:200, 300, 400, 600, 1000
+(a)  min-max normalization by setting min=0 and max=1
+(b)  z-score normalization
+(c)  z-score normalization using the mean absolute deviation instead of standard deviation
+(d)  normalization by decimal scaling.
+```{r}
+#(a)
+datalist <- c(200, 300, 400, 600, 1000)
+
+maxmin <- function(x1) (x1 - min(x1))/(max(x1)-min(x1))*(1-0)+0
+
+maxmin(datalist)
+```
+```{r}
+#(b)
+
+zscore <- function(x1) (x1- mean(x1))/sd(x1)
+
+zscore(datalist)
+
+```
+```{r}
+#(c)
+
+zscore.abs <- function(x1) (x1 - mean(x1))/((1/length(x1))*(sum(abs(x1-mean(x1)))))
+
+zscore.abs(datalist)
+```
+```{r}
+#(d) for fun
+
+dscale <- function(x1) (x1)/(10^(nchar(max(x1))))
+
+dscale(datalist)
+
+```

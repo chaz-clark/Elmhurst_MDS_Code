@@ -1,0 +1,129 @@
+---
+title: "Problem 6.6a part 1"
+output: html_notebook
+---
+
+6.6A database has five transactions. Let minsup=60% and minconf=80%.
+(a)  Find all frequent itemsets using Apriori and FP-growth, respectively. Compare the efficiency of the two mining processes.
+
+TIDitemsbought
+T100{M, O, N, K, E, Y}
+T200{D, O, N, K, E, Y}
+T300{M, A, K, E}
+T400{M, U, C, K, Y}
+T500{C, O, O, K, I, E}
+
+```{r}
+#import the data
+library(readr)
+#Book2 <- read_csv("/Volumes/MacProHHD64MB/MovedUsers/ChazInkLLC/Documents/Documents - Mac Pro/Elmhurst/Data Mining/Unit 5 and 6/Book2.csv")
+View(Book2) 
+```
+
+```{r}
+#modify the data for use
+items <- cbind(Book2$I1,Book2$I2,Book2$I3,Book2$I4,Book2$I5,Book2$I6)
+items <- split(items,row(items))
+#items <- data.frame(items, check.names = FALSE)
+items2<- c(items[1],items[2],items[3],items[4],items[5],items[6])
+items2
+length(items)
+#image(items)
+```
+
+```{r}
+library("rCBA")
+data("iris")
+output <- rCBA::buildFPGrowth(iris[sample(nrow(iris), 20),], "Species", parallel=FALSE)
+model <- output$model
+predictions <- rCBA::classification(iris, model)
+table(predictions)
+sum(as.character(iris$Species)==as.character(predictions), na.rm=TRUE) / length(predictions)
+```
+
+
+```{r}
+library(rCBA)
+library(arules)
+library(rJava)
+#data("iris")
+#TID <-list(c("M","O","N","K","E","Y"),c("D","O","N","K","E","Y"),c("M","A","K","E"),c("M","U","C","K","Y"),c("C","O","O","K","I","E"))
+
+train <- sapply(items,as.factor)
+train <- data.frame(train, check.names=FALSE)
+train
+#train <- data.frame(train = unlist(train))
+txns <- as(train,"transactions")
+txns
+#colnames(train) <-c(1:5)
+#Class: Species=setosa, Species=versicolor, Species=virginica
+rules = rCBA::fpgrowth(txns, support=0.03, confidence=0.03, maxLength=2, consequent="1", parallel=FALSE)
+
+#rules = fpgrowth(txns, support=0.03, confidence=0.03, maxLength=2, consequent=Null)
+#rulesFrame <- as(rules,"data.frame")
+
+predictions <- rCBA::classification(train,rules)
+table(predictions)
+sum(as.character(train$Species)==as.character(predictions),na.rm=TRUE)/length(predictions)
+prunedRules <- rCBA::pruning(train, rules, method="m2cba", parallel=FALSE)
+predictions <- rCBA::classification(train, prunedRules)
+table(predictions)
+sum(as.character(train$Species)==as.character(predictions),na.rm=TRUE)/length(predictions)
+```
+
+
+FP-Growth
+```{r}
+#FP-Growth
+TID <- list(c("M","O","N","K","E","Y"),c("D","O","N","K","E","Y"),c("M","A","K","E"),c("M","U","C","K","Y"),c("C","O","O","K","I","E"))
+TID_Header <- c("T100","T200","T300","T400","T500")
+TID2 <- cbind(TID_Header,TID)
+TID2
+
+library(rCBA)
+#library(arules)
+#library("rCBA")
+#data("iris")
+
+train <- sapply(TID2,as.factor)
+train <- data.frame(train = unlist(train))
+txns <- as(train,"transactions")
+#train
+rules = rCBA::fpgrowth(txns, support=0.03, confidence=0.03, maxLength=2, consequent="TID", parallel=FALSE)
+
+#apriori + clasification
+#rules = apriori(txns, parameter=list(support=0.03, confidence=0.03, minlen=2), appearance = list(rhs=c("Species=setosa", "Species=versicolor", "Species=virginica"),default="lhs"))
+#rulesFrame <- as(rules,"data.frame")
+
+#predictions <- rCBA::classification(train,rules)
+#table(predictions)
+#sum(as.character(train$Species)==as.character(predictions),na.rm=TRUE)/length(predictions)
+
+#prunedRules <- rCBA::pruning(train, rules, method="m2cba", parallel=FALSE)
+#predictions <- rCBA::classification(train, prunedRules)
+#table(predictions)
+#sum(as.character(train$Species)==as.character(predictions),na.rm=TRUE)/length(predictions)
+
+```
+
+FP-Growth 
+```{r}
+#FP-growth
+
+#install.packages("arulesCBA", dependencies = TRUE)
+library(arulesCBA)
+
+results2 =  CBA(Species ~ Sepal,data = txns, supp = 0.6, conf = 0.8)
+
+#predictions <- rCBA::classification(train,rules)
+#table(predictions)
+#sum(as.character(train$Species)==as.character(predictions),na.rm=TRUE)/length(predictions)
+#prunedRules <- rCBA::pruning(train, rules, method="m2cba", parallel=FALSE)
+#predictions <- rCBA::classification(train, prunedRules)
+#table(predictions)
+#sum(as.character(train$Species)==as.character(predictions),na.rm=TRUE)/length(predictions)
+```
+
+Compare the efficiency of the two mining processes:
+###
+
