@@ -1,0 +1,140 @@
+---
+title: "Chapter 5 Chaz Clark"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+---
+
+5. The data set fancy concerns the monthly sales figures of a shop which opened in January 1987 and sells gifts, souvenirs, and novelties. The shop is situated on the wharf at a beach resort town in Queensland, Australia. The sales volume varies with the seasonal population of tourists. There is a large influx of visitors to the town at Christmas and for the local surfing festival, held every March since 1988. Over time, the shop has expanded its premises, range of products, and staff.
+
+a. Produce a time plot of the data and describe the patterns in the graph. Identify any unusual or unexpected fluctuations in the time series.
+```{r}
+library(fpp2)
+library(xts)
+souvenir <- scan("http://robjhyndman.com/tsdldata/data/fancy.dat")
+souvenirtimeseries <- ts(souvenir, frequency=12, start=c(1987,1))
+plot.ts(souvenirtimeseries)
+```
+ANSWER: the chart shows seasonality around Christmas time, then seems to grow exponentially starting with the dip in 1991 through 1994.You can also see the bump every march for the festival.
+
+b. Explain why it is necessary to take logarithms of these data before fitting a model.
+ANSWER: as described above in section a, the growth is exponential and non linear so takign the log of the values makes the data linear to analyze then it needs reverted back at the end
+
+c. Use R to fit a regression model to the logarithms of these sales data with a linear trend, seasonal dummies and a “surfing festival” dummy variable.
+
+```{r}
+#library(tsbox)
+
+#below are all the attempts that did not work, and i still dont think the festival dummy is working right
+
+#log.souvenir<- log(souvenir)
+#log.souvenir
+#log.souvenirtimeseries <- ts(log.souvenir, frequency=12, start=c(1987,1))
+#tail(log.souvenirtimeseries)
+#plot.ts(souvenirtimeseries)
+#log.souvenirtimeseries$Festival_Dummy <- with(log.souvenirtimeseries, xts(ifelse()))
+#log_fancy2 <- ts(log_fancy)
+#log_fancy3 <- ts(log_fancy2, frequency = 12, start = c(1987,1))
+#head(log_fancy3)
+
+#fancy_log <- log_fancy2$Volume
+#festivalDummy <- log_fancy2$Festival_Dummy
+#festivalDummyTS <- ts(festivalDummy, frequency=12, start=c(1987,1))
+#fancy_logTS <- ts(fancy_log, frequency = 12, start = c(1987,1))
+#fancy_data <- data.frame(fancy_log,festivalDummyTS)
+#combined_date <- ts_c(fancy_logTS,festivalDummyTS)
+#fit.log.fancy <- tslm(combined_date ~ trend + season + festivalDummyTS , data = combined_date)
+#summary(fit.log.fancy)
+```
+Note: i am not sure why i cant get the festival dummy to work in the same ts() and it gets all NA when in its own ts()... Below i am attempting someones solution found online: (https://github.com/mldataanalysis/Time-Series-Solutions/blob/master/Exercise%205(1)%20-%20ANSWERs.R)
+```{r}
+log_fancy <- log(souvenir)
+dummy_fest = rep(0, length(souvenir))
+dummy_fest[seq_along(dummy_fest)%%12 == 3] <- 1
+dummy_fest[3] <- 0
+dummy_fest <- ts(dummy_fest, freq = 12, start=c(1987,1))
+my_data <- data.frame(
+  log_fancy,
+  dummy_fest
+)
+log_fancyTS <- ts(log_fancy, freq = 12, start=c(1987,1))
+#added to fix error in line 61
+fit <- tslm(log_fancyTS ~ trend + season + dummy_fest, data=my_data)
+#Error in tslm(log_fancy ~ trend + season + dummy_fest, data = my_data) : Not time series data, use lm()
+summary(fit)
+```
+
+
+d. Plot the residuals against time and against the fitted values. Do these plots reveal any problems with the model?
+```{r}
+#residuals(fit)
+autoplot(residuals(fit), series="Residuals") +
+  autolayer(fitted(fit), series="Fitted") +
+  xlab("year") + ylab ("") + 
+  ggtitle("Residuals vs Fitted") + 
+  guides(colour=guide_legend(title=" "))
+
+```
+ANSWER: after this chart not really working out, i am applyting others solutions i found online, however i fixed this but now need to revert the log transform on this column to chart it... working on that, but in the mean time below is additional charts per exampels online
+```{r}
+plot(residuals(fit), type ='p')
+
+```
+```{r}
+plot(as.numeric(fitted(fit)),residuals(fit), type='p')
+```
+
+ANSWER: It still appears that not getting it right in part c is carrying through to these charts. I fixed this and now the chart is showing all the data within .3 to -0.3, so things are looking good.
+
+e. Do boxplots of the residuals for each month. Does this reveal any problems with the model?
+```{r}
+boxplot(residuals(fit)~cycle(residuals(fit)))
+```
+ANSWER: it does not appear that there is sufficient data outside the threshold to indicate more meaning can be extracted in the data
+
+f.What do the values of the coefficients tell you about each variable?
+```{r}
+summary(fit)
+```
+ANSWER: All variables, month 1-12 + dummy_fest, have some level of significance, the two lowest are the dummy_fest and month 2, while month 3 has no significance at all.
+
+g.What does the Breusch-Godfrey test tell you about your model?
+```{r}
+checkresiduals(fit)
+```
+Breusch-Godfrey test for serial correlation of order up to 17
+data:  Residuals from Linear regression model
+LM test = 37.954, df = 17, p-value = 0.002494
+
+ANSWER:
+Now this seems to indicate that there is somemore information we could get out if it expecially in lag 1, 2, and 3. The later lags also indicate something is going on. This is allso indicitive of the residuals being off of the distribution, but not by much.
+
+h.Regardless of your ANSWERs to the above questions, use your regression model to predict the monthly sales for 1994, 1995, and 1996. Produce prediction intervals for each of your forecasts.
+```{r}
+#additional code from source
+future_data <- data.frame(
+  dummy_fest = rep(0, 36))
+future_data[3,] <- 1
+fcast <- forecast(fit, newdata=future_data)
+fcast
+```
+```{r}
+autoplot(fcast)
+```
+
+i.Transform your predictions and intervals to obtain predictions and intervals for the raw data.
+```{r}
+pred.df <- as.data.frame(fcast)
+pred.df <- exp(pred.df)
+pred.df
+```
+```{r}
+#attempt to replot the values in data frame that is converted to ts() but its not working
+#library(xts)
+#pred.df.TS <- xts(pred.df[,-1], order.by=as.Date(pred.df[,1], "%b %Y"))
+#autoplot(pred.df.TS)
+```
+
+j.How could you improve these predictions by modifying the model?
+I think we need stronger tools for multi-variable forecasting. It seems that tslm() is leaving some additional information in the data that it cannot match or extract.

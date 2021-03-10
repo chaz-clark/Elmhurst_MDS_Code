@@ -1,0 +1,492 @@
+---
+title: "Stock Data Forecasting Chaz Clark"
+output: html_notebook
+---
+
+Choose some time series data of interest to you, perhaps data that might be applicable to your course project. Use some of the exponential smoothing methods you have been practicing to produce an initial forecast for these data. Use this forum to discuss your solutions, questions, and ideas.
+```{r}
+#load the libraries
+library(quantmod)
+library(xts)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(gapminder)
+library(TTR)
+library(plyr)
+library(fpp2)
+```
+
+```{r}
+#get the data
+options("getSymbols.warning4.0"=FALSE)
+getSymbols('AAPL', from = "2007-01-03", to = "2020-5-14")
+autoplot(AAPL$AAPL.Close)
+#tail(AAPL)
+AAPL2<-AAPL
+
+getSymbols('AAPL', from = "2007-01-03", to = "2020-5-13")
+AAPL3<-AAPL
+
+getSymbols('AAPL', from = "2007-01-03", to = "2020-5-8")
+AAPL4<-AAPL
+
+getSymbols('AAPL', from = "2007-01-03", to = "2020-4-30")
+AAPL5<-AAPL
+
+#convert to dt
+AAPLdt <- data.table(Date=index(AAPL2), coredata(AAPL2))
+
+#convert to weekly
+AAPLw <- to.weekly(AAPLdt)
+#convert to monthly
+AAPLm <- to.monthly(AAPLdt)
+
+#convert to dt
+AAPLdt2 <- data.table(Date=index(AAPL3), coredata(AAPL3))
+AAPLdt3 <- data.table(Date=index(AAPL4), coredata(AAPL4))
+AAPLdt4 <- data.table(Date=index(AAPL5), coredata(AAPL5))
+#convert to weekly
+AAPLw2 <- to.weekly(AAPLdt3)
+#convert to monthly
+AAPLm2 <- to.monthly(AAPLdt4)
+
+
+#library(padr)
+#AAPL2 <- AAPLdt %>% pad()
+
+#set some variables
+#i=4
+df = 5
+wf = 52
+mf = 12
+
+#library(timeDate)
+# A timeDate Sequence
+#date.sequence <- timeSequence(as.Date("2007-01-03"), as.Date("2020-02-28"));  # a short example period with three London holidays
+#date.sequence;
+
+# holidays in the period
+#years.included <- unique( as.integer( format( x=date.sequence, format="%Y" ) ) );
+#holidays <- holidayNYSE(years.included)  #  (locale was not specified by OP in question nor in profile, so this assumes for example: holidayLONDON; also supported by timeDate are: holidayNERC, holidayNYSE, holidayTSX & holidayZURICH)
+
+# Subset business days
+#business.days <- date.sequence[isBizday(date.sequence, holidays)]; 
+#business.days
+
+#source:https://stackoverflow.com/questions/13673895/r-time-series-data-daily-only-working-days
+
+#convert dt to ts with xts
+#mytsd2 <- ts(AAPLdt[,"AAPL.Close"])
+#mytsd2
+#mytsw2 <- xts(AAPLw[,"AAPLdt.Close"], order.by = as.POSIXct(business.days))
+#mytsm2 <- xts(AAPLm[,"AAPLdt.Close"], order.by = as.POSIXct(business.days))
+
+#convert dt to ts
+mytsd <- ts(AAPLdt[,"AAPL.Close"], frequency=df, start=c(2007,1))
+mytsw <- ts(AAPLw[,"AAPLdt.Close"], frequency=wf, start=c(2007,1))
+mytsm <- ts(AAPLm[,"AAPLdt.Close"], frequency=mf, start=c(2007,1))
+
+#set the training datasets
+mytsd.train <- ts(AAPLdt2[,"AAPL.Close"], frequency=df, start=c(2007,1))
+mytsw.train <- ts(AAPLw2[,"AAPLdt3.Close"], frequency=wf, start=c(2007,1))
+mytsm.train <- ts(AAPLm2[,"AAPLdt4.Close"], frequency=mf, start=c(2007,1))
+
+#forecast paramaters
+hd = length(mytsd) - length(mytsd.train)
+hw = length(mytsw) - length(mytsw.train)
+hm = length(mytsm) - length(mytsm.train)
+```
+
+```{r}
+#start with daily
+#ETSd <- mytsd.train %>% ets(model="ZZZ", lambda = 0, biasadj = TRUE, allow.multiplicative.trend = TRUE) %>% forecast(h=hd)
+ETSd <- mytsd.train %>% ets() %>% forecast(h=hd)
+#ARIMAd1 <- mytsd.train %>% auto.arima(lambda = 0,biasadj = TRUE, stepwise = FALSE, approximation = FALSE) %>% forecast(h=hd)
+ARIMAd <- mytsd.train %>% auto.arima(lambda = 0,biasadj = TRUE) %>% forecast(h=hd)
+trend <- seq_along(mytsd.train)
+#ARIMAd2 <- mytsd.train %>% auto.arima(lambda = 0,biasadj = TRUE, d=0, xreg=trend) %>% forecast(h=hd, xreg = length(mytsd.train))
+STLd <- mytsd.train  %>%  stlf(lambda = 0, h=hd, biasadj = TRUE)
+MSTLd <- mytsd.train  %>%  mstl(lambda = 0) %>% forecast(h=hd)
+NNARd <- mytsd.train %>%  nnetar(lambda = 0) %>% forecast(h=hd)
+TBATSd <- mytsd.train %>% tbats(biasadj = TRUE) %>% forecast(h=hd)
+Combinationd <- (ETSd[["mean"]] + ARIMAd[["mean"]] + STLd[["mean"]] +  NNARd[["mean"]] + TBATSd[["mean"]])/5
+#Combinationd2 <- (ETSd[["mean"]] + ETSd2[["mean"]] + ARIMAd[["mean"]] + ARIMAd2[["mean"]] +STLd[["mean"]] + MSTLd[["mean"]] + NNARd[["mean"]] + TBATSd[["mean"]])/8
+
+autoplot(mytsd) +
+  autolayer(ETSd, series="ETS", PI=FALSE) +
+  autolayer(ARIMAd, series="ARIMA", PI=FALSE) +
+  autolayer(STLd, series="STL", PI=FALSE) +
+  autolayer(NNARd, series="NNAR", PI=FALSE) +
+  autolayer(TBATSd, series="TBATS", PI=FALSE) +
+  autolayer(Combinationd, series="Combination") +
+  xlab("Year") + ylab("$") +
+  ggtitle("Apple Daily Stock Price")
+```
+
+```{r}
+#compare the RSME for all models calculated:
+c(ETS = accuracy(ETSd, mytsd)["Test set","RMSE"],
+  #ETS2 = accuracy(ETSd2, mytsd)["Test set","RMSE"],
+  ARIMA = accuracy(ARIMAd, mytsd)["Test set","RMSE"],
+  #ARIMA2 = accuracy(ARIMAd2, mytsd)["Test set","RMSE"],
+  `STL-ETS` = accuracy(STLd, mytsd)["Test set","RMSE"],
+  `MSTL-ETS` = accuracy(MSTLd, mytsd)["Test set","RMSE"],
+  NNAR = accuracy(NNARd, mytsd)["Test set","RMSE"],
+  TBATS = accuracy(TBATSd, mytsd)["Test set","RMSE"],
+  Combination =accuracy(Combinationd, mytsd)["Test set","RMSE"]#,
+  #Combination2 =accuracy(Combinationd2, mytsd)["Test set","RMSE"]
+  )
+```
+NNAR does very well on its own, It beats the rest of them and the Conbination. 2nd Place goes to ARIMA.Since i am unaware of how to check residuals of a NNAR, we will do so for ARIMA
+```{r}
+mytsd.train %>% auto.arima(lambda = 0,biasadj = TRUE) %>% checkresiduals()
+```
+
+```{r}
+#next weekly data
+ETSw <- mytsw.train %>% ets() %>% forecast(h=hw)
+ARIMAw <- mytsw.train %>% auto.arima(lambda = 0,biasadj = TRUE) %>% forecast(h=hw)
+STLw <- mytsw.train  %>%  stlf(lambda = 0, h=hw, biasadj = TRUE)
+#MSTLw <- mytsw.train  %>%  mstl(lambda = 0, biasadj = TRUE) %>% forecast(h=hw)
+NNARw <- mytsw.train %>%  nnetar(lambda = 0) %>% forecast(h=hw)
+TBATSw <- mytsw.train %>% tbats(biasadj = TRUE) %>% forecast(h=hw)
+Combinationw <- (ETSw[["mean"]] + ARIMAw[["mean"]] +STLw[["mean"]] + NNARw[["mean"]] + TBATSw[["mean"]])/5
+
+autoplot(mytsw) +
+  autolayer(ETSw, series="ETS", PI=FALSE) +
+  autolayer(ARIMAw, series="ARIMA", PI=FALSE) +
+  autolayer(STLw, series="STL", PI=FALSE) +
+  autolayer(NNARw, series="NNAR", PI=FALSE) +
+  autolayer(TBATSw, series="TBATS", PI=FALSE) +
+  autolayer(Combinationw, series="Combination") +
+  xlab("Year") + ylab("$") +
+  ggtitle("Apple Weekly Stock Price")
+```
+
+```{r}
+#compare the RSME for all models calculated:
+c(ETS = accuracy(ETSw, mytsw)["Test set","RMSE"],
+  ARIMA = accuracy(ARIMAw, mytsw)["Test set","RMSE"],
+  `STL-ETS` = accuracy(STLw, mytsw)["Test set","RMSE"],
+  #`MSTL-ETS` = accuracy(MSTLw, mytsw)["Test set","RMSE"],
+  NNAR = accuracy(NNARw, mytsw)["Test set","RMSE"],
+  TBATS = accuracy(TBATSw, mytsw)["Test set","RMSE"],
+  Combination =accuracy(Combinationw, mytsw)["Test set","RMSE"]
+  )
+```
+Here again ARIMA does well yet this time its better than the Combination, and compared to the daily values the RSME has slighly increase for ARIMA.
+
+```{r}
+mytsw.train %>% auto.arima(lambda = 0,biasadj = TRUE) %>% checkresiduals()
+```
+
+```{r}
+#lastly monthly data
+ETSm <- mytsm.train %>% ets() %>% forecast(h=hm)
+ARIMAm <- mytsm.train %>% auto.arima(lambda = 0,biasadj = TRUE) %>% forecast(h=hm)
+STLm <- mytsm.train  %>%  stlf(lambda = 0, h=hm, biasadj = TRUE)
+NNARm <- mytsm.train %>%  nnetar(lambda = 0) %>% forecast(h=hm)
+TBATSm <- mytsm.train %>% tbats(biasadj = TRUE) %>% forecast(h=hm)
+Combinationm <- (ETSm[["mean"]] + ARIMAm[["mean"]] +STLm[["mean"]] + NNARm[["mean"]] + TBATSm[["mean"]])/5
+
+autoplot(mytsm) +
+  autolayer(ETSm, series="ETS", PI=FALSE) +
+  autolayer(ARIMAm, series="ARIMA", PI=FALSE) +
+  autolayer(STLm, series="STL", PI=FALSE) +
+  autolayer(NNARm, series="NNAR", PI=FALSE) +
+  autolayer(TBATSm, series="TBATS", PI=FALSE) +
+  autolayer(Combinationm, series="Combination") +
+  xlab("Year") + ylab("$") +
+  ggtitle("Apple Monthly Stock Price")
+```
+
+```{r}
+#compare the RSME for all models calculated:
+c(ETS = accuracy(ETSm, mytsm)["Test set","RMSE"],
+  ARIMA = accuracy(ARIMAm, mytsm)["Test set","RMSE"],
+  `STL-ETS` = accuracy(STLm, mytsm)["Test set","RMSE"],
+  NNAR = accuracy(NNARm, mytsm)["Test set","RMSE"],
+  TBATS = accuracy(TBATSm, mytsm)["Test set","RMSE"],
+  Combination =accuracy(Combinationm, mytsm)["Test set","RMSE"]
+  )
+```
+Here we see that ARIMA again is the leader even above the Combination again and that it has again increased from the Weekly and Daily values
+
+```{r}
+mytsm.train %>% auto.arima(lambda = 0,biasadj = TRUE) %>% checkresiduals()
+```
+
+```{r}
+#mytsd.train %>% nsdiffs()
+#mytsd.train %>% log() %>% ndiffs()
+#mytsd.train %>% diff() %>% Box.test(type="Ljung-Box")
+#library(urca)
+#mytsd.train %>% ur.kpss() %>% summary()
+#mytsd.train %>% diff() %>%  ur.kpss() %>% summary()
+
+cbind("Original Data" = mytsd.train,
+      "BoxCox" = BoxCox(mytsd.train, lambda = 0),
+      "Seasonally\n differenced logs" =
+        diff(log(mytsd.train),5),
+      "Single\n differenced logs" =
+        diff(BoxCox(mytsd.train, lambda = 0),1),
+      "Double\n difference  logs" = 
+        diff(diff(log(mytsd.train),5),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") +
+  ggtitle("Apple Daily Stock Price")
+```
+
+```{r}
+#mytsw.train %>% nsdiffs()
+#mytsw.train %>% log() %>% ndiffs()
+#mytsw.train %>% diff() %>% Box.test(type="Ljung-Box")
+#library(urca)
+#mytsw.train %>% ur.kpss() %>% summary()
+#mytsw.train %>% diff() %>%  ur.kpss() %>% summary()
+
+cbind("Original Data" = mytsw.train,
+      "BoxCox" = BoxCox(mytsw.train, lambda = 0),
+      "Seasonally\n differenced logs" =
+        diff(log(mytsw.train),52),
+      "Single\n differenced logs" =
+        diff(BoxCox(mytsw.train, lambda = 0),1),
+      "Double\n difference  logs" = 
+        diff(diff(log(mytsw.train),52),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") +
+  ggtitle("Apple Weekly Stock Price")
+```
+
+```{r}
+#mytsm.train %>% nsdiffs()
+#mytsm.train %>% log() %>% ndiffs()
+#mytsm.train %>% diff() %>% Box.test(type="Ljung-Box")
+#library(urca)
+#mytsm.train %>% ur.kpss() %>% summary()
+#mytsm.train %>% diff() %>%  ur.kpss() %>% summary()
+
+cbind("Original Data" = mytsm.train,
+      "BoxCox" = BoxCox(mytsm.train, lambda = 0),
+      "Seasonally\n differenced logs" =
+        diff(log(mytsm.train),12),
+      "Single\n differenced logs" =
+        diff(BoxCox(mytsm.train, lambda = 0),1),
+      "Double\n difference  logs" = 
+        diff(diff(log(mytsm.train),12),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") +
+  ggtitle("Apple Monthly Stock Price")
+```
+
+```{r}
+#(2,1,2)(2,0,0) Daily
+A1 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,0,0), lambda = 0)
+A2 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,1,0), lambda = 0)
+A3 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,1,1), lambda = 0)
+A4 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,0,1), lambda = 0)
+A5 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,0,2), lambda = 0)
+A6 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,1,2), lambda = 0)
+A7 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(1,1,1), lambda = 0)
+A8 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(0,1,1), lambda = 0)
+A9 <- mytsd.train %>% Arima(order = c(3,1,2), seasonal = c(2,0,0), lambda = 0)
+A10 <- mytsd.train %>% Arima(order = c(2,1,3), seasonal = c(2,0,0), lambda = 0)
+A11 <- mytsd.train %>% Arima(order = c(3,1,3), seasonal = c(2,0,0), lambda = 0)
+A12 <- mytsd.train %>% Arima(order = c(4,1,2), seasonal = c(2,0,0), lambda = 0)
+A13 <- mytsd.train %>% Arima(order = c(2,1,0), seasonal = c(2,0,0), lambda = 0)
+A14 <- mytsd.train %>% Arima(order = c(2,1,0), seasonal = c(2,1,2), lambda = 0)
+
+
+c(A1 = AIC(A1),
+  A2 = AIC(A2),
+  A3 = AIC(A3),
+  A4 = AIC(A4),
+  A5 = AIC(A5),
+  A6 = AIC(A6),
+  A7 = AIC(A7),
+  A8 = AIC(A8),
+  A9 = AIC(A9),
+  A10 = AIC(A10),
+  A11 = AIC(A11),
+  A12 = AIC(A12),
+  A13 = AIC(A13),
+  A14 = AIC(A14)
+)
+```
+
+```{r}
+#(2,1,2)(2,0,0) Daily
+A1 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hd)
+A2 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,1,0), lambda = 0) %>% forecast(h=hd)
+A3 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,1,1), lambda = 0) %>% forecast(h=hd)
+A4 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,0,1), lambda = 0) %>% forecast(h=hd)
+A5 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,0,2), lambda = 0) %>% forecast(h=hd)
+A6 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(2,1,2), lambda = 0) %>% forecast(h=hd)
+A7 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(1,1,1), lambda = 0) %>% forecast(h=hd)
+A8 <- mytsd.train %>% Arima(order = c(2,1,2), seasonal = c(0,1,1), lambda = 0) %>% forecast(h=hd)
+A9 <- mytsd.train %>% Arima(order = c(3,1,2), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hd)
+A10 <- mytsd.train %>% Arima(order = c(2,1,3), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hd)
+A11 <- mytsd.train %>% Arima(order = c(3,1,3), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hd)
+A12 <- mytsd.train %>% Arima(order = c(4,1,2), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hd)
+A13 <- mytsd.train %>% Arima(order = c(2,1,0), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hd)
+A14 <- mytsd.train %>% Arima(order = c(2,1,0), seasonal = c(2,1,2), lambda = 0) %>% forecast(h=hd)
+
+#compare the RSME for all models calculated:
+c(A1 = accuracy(A1, mytsd)["Test set","RMSE"],
+  A2 = accuracy(A2, mytsd)["Test set","RMSE"],
+  A3 = accuracy(A3, mytsd)["Test set","RMSE"],
+  A4 = accuracy(A4, mytsd)["Test set","RMSE"],
+  A5 = accuracy(A5, mytsd)["Test set","RMSE"],
+  A6 = accuracy(A6, mytsd)["Test set","RMSE"],
+  A7 = accuracy(A7, mytsd)["Test set","RMSE"],
+  A8 = accuracy(A8, mytsd)["Test set","RMSE"],
+  A9 = accuracy(A9, mytsd)["Test set","RMSE"],
+  A10 = accuracy(A10, mytsd)["Test set","RMSE"],
+  A11 = accuracy(A11, mytsd)["Test set","RMSE"],
+  A12 = accuracy(A12, mytsd)["Test set","RMSE"],
+  A13 = accuracy(A13, mytsd)["Test set","RMSE"],
+  A14 =accuracy(A14, mytsd)["Test set","RMSE"]
+  )
+```
+
+```{r}
+#(3,1,1)(2,0,1) Weekly
+A1  <- mytsw.train %>% auto.arima(lambda = 0,biasadj = TRUE)
+#A2 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,1,0), lambda = 0)
+#A3 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,1,1), lambda = 0)
+#A4 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,0,0), lambda = 0)
+#A5 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,0,2), lambda = 0)
+#A6 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,1,2), lambda = 0)
+A7 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(1,1,1), lambda = 0)
+A8 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(0,1,1), lambda = 0)
+#A9 <- mytsw.train %>% Arima(order = c(3,1,2), seasonal = c(2,0,0), lambda = 0)
+#A10 <- mytsw.train %>% Arima(order = c(2,1,1), seasonal = c(2,0,0), lambda = 0)
+A11 <- mytsw.train %>% Arima(order = c(3,1,3), seasonal = c(2,0,0), lambda = 0)
+#A12 <- mytsw.train %>% Arima(order = c(4,1,2), seasonal = c(2,0,0), lambda = 0)
+#A13 <- mytsw.train %>% Arima(order = c(3,1,0), seasonal = c(2,0,0), lambda = 0)
+#A14 <- mytsw.train %>% Arima(order = c(3,1,0), seasonal = c(2,1,2), lambda = 0)
+
+
+c(A1 = AIC(A1),
+  #A2 = AIC(A2),
+  #A3 = AIC(A3),
+  #A4 = AIC(A4),
+  #A5 = AIC(A5),
+  #A6 = AIC(A6),
+  A7 = AIC(A7),
+  A8 = AIC(A8),
+  #A9 = AIC(A9),
+  #A10 = AIC(A10),
+  A11 = AIC(A11)#,
+  #A12 = AIC(A12),
+  #A13 = AIC(A13),
+  #A14 = AIC(A14)
+)
+```
+
+```{r}
+#(3,1,1)(2,0,1) Weekly %>% forecast(h=hw)
+A1  <- ARIMAw
+#A2 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,1,0), lambda = 0) %>% forecast(h=hw)
+#A3 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,1,1), lambda = 0) %>% forecast(h=hw)
+#A4 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hw)
+#A5 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,0,2), lambda = 0) %>% forecast(h=hw)
+#A6 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(2,1,2), lambda = 0) %>% forecast(h=hw)
+A7 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(1,1,1), lambda = 0) %>% forecast(h=hw)
+A8 <- mytsw.train %>% Arima(order = c(3,1,1), seasonal = c(0,1,1), lambda = 0) %>% forecast(h=hw)
+#A9 <- mytsw.train %>% Arima(order = c(3,1,2), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hw)
+#A10 <- mytsw.train %>% Arima(order = c(2,1,1), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hw)
+A11 <- mytsw.train %>% Arima(order = c(3,1,3), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hw)
+#A12 <- mytsw.train %>% Arima(order = c(4,1,2), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hw)
+#A13 <- mytsw.train %>% Arima(order = c(3,1,0), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hw)
+#A14 <- mytsw.train %>% Arima(order = c(3,1,0), seasonal = c(2,1,2), lambda = 0) %>% forecast(h=hw)
+
+#compare the RSME for all models calculated:
+c(A1 = accuracy(A1, mytsw)["Test set","RMSE"],
+  #A2 = accuracy(A2, mytsd)["Test set","RMSE"],
+  #A3 = accuracy(A3, mytsd)["Test set","RMSE"],
+  #A4 = accuracy(A4, mytsd)["Test set","RMSE"],
+  #A5 = accuracy(A5, mytsd)["Test set","RMSE"],
+  #A6 = accuracy(A6, mytsd)["Test set","RMSE"],
+  A7 = accuracy(A7, mytsw)["Test set","RMSE"],
+  A8 = accuracy(A8, mytsw)["Test set","RMSE"],
+  #A9 = accuracy(A9, mytsd)["Test set","RMSE"],
+  #A10 = accuracy(A10, mytsd)["Test set","RMSE"],
+  A11 = accuracy(A11, mytsw)["Test set","RMSE"]#,
+  #A12 = accuracy(A12, mytsd)["Test set","RMSE"],
+  #A13 = accuracy(A13, mytsd)["Test set","RMSE"],
+  #A14 =accuracy(A14, mytsd)["Test set","RMSE"]
+  )
+```
+
+```{r}
+#(0,1,0)(2,0,0) Monthly
+A1 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,0,0), lambda = 0) 
+A2 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,1,0), lambda = 0) 
+A3 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,1,1), lambda = 0) 
+A4 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,0,1), lambda = 0) 
+A5 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,0,2), lambda = 0) 
+A6 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,1,2), lambda = 0) 
+A7 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(1,1,1), lambda = 0) 
+A8 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(0,1,1), lambda = 0) 
+A9 <- mytsm.train %>% Arima(order = c(1,1,1), seasonal = c(2,0,0), lambda = 0) 
+A10 <- mytsm.train %>% Arima(order = c(0,1,1), seasonal = c(2,0,0), lambda = 0) 
+A11 <- mytsm.train %>% Arima(order = c(1,1,0), seasonal = c(2,0,0), lambda = 0)
+A12 <- mytsm.train %>% Arima(order = c(0,1,2), seasonal = c(2,0,0), lambda = 0) 
+A13 <- mytsm.train %>% Arima(order = c(1,1,2), seasonal = c(2,0,0), lambda = 0) 
+A14 <- mytsm.train %>% Arima(order = c(0,2,0), seasonal = c(2,0,0), lambda = 0) 
+
+c(A1 = AIC(A1),
+  A2 = AIC(A2),
+  A3 = AIC(A3),
+  A4 = AIC(A4),
+  A5 = AIC(A5),
+  A6 = AIC(A6),
+  A7 = AIC(A7),
+  A8 = AIC(A8),
+  A9 = AIC(A9),
+  A10 = AIC(A10),
+  A11 = AIC(A11),
+  A12 = AIC(A12),
+  A13 = AIC(A13),
+  A14 = AIC(A14)
+)
+```
+
+```{r}
+#(0,1,0)(2,0,0) Monthly
+A1 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hm)
+A2 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,1,0), lambda = 0) %>% forecast(h=hm)
+A3 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,1,1), lambda = 0) %>% forecast(h=hm)
+A4 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,0,1), lambda = 0) %>% forecast(h=hm)
+A5 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,0,2), lambda = 0) %>% forecast(h=hm)
+A6 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(2,1,2), lambda = 0) %>% forecast(h=hm)
+A7 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(1,1,1), lambda = 0) %>% forecast(h=hm)
+A8 <- mytsm.train %>% Arima(order = c(0,1,0), seasonal = c(0,1,1), lambda = 0) %>% forecast(h=hm)
+A9 <- mytsm.train %>% Arima(order = c(1,1,1), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hm)
+A10 <- mytsm.train %>% Arima(order = c(0,1,1), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hm)
+A11 <- mytsm.train %>% Arima(order = c(1,1,0), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hm)
+A12 <- mytsm.train %>% Arima(order = c(0,1,2), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hm)
+A13 <- mytsm.train %>% Arima(order = c(1,1,0), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hm)
+A14 <- mytsm.train %>% Arima(order = c(0,2,0), seasonal = c(2,0,0), lambda = 0) %>% forecast(h=hm)
+
+#compare the RSME for all models calculated:
+c(A1 = accuracy(A1, mytsm)["Test set","RMSE"],
+  A2 = accuracy(A2, mytsm)["Test set","RMSE"],
+  A3 = accuracy(A3, mytsm)["Test set","RMSE"],
+  A4 = accuracy(A4, mytsm)["Test set","RMSE"],
+  A5 = accuracy(A5, mytsm)["Test set","RMSE"],
+  A6 = accuracy(A6, mytsm)["Test set","RMSE"],
+  A7 = accuracy(A7, mytsm)["Test set","RMSE"],
+  A8 = accuracy(A8, mytsm)["Test set","RMSE"],
+  A9 = accuracy(A9, mytsm)["Test set","RMSE"],
+  A10 = accuracy(A10, mytsm)["Test set","RMSE"],
+  A11 = accuracy(A11, mytsm)["Test set","RMSE"],
+  A12 = accuracy(A12, mytsm)["Test set","RMSE"],
+  A13 = accuracy(A13, mytsm)["Test set","RMSE"],
+  A14 =accuracy(A14, mytsm)["Test set","RMSE"]
+  )
+```
+
+

@@ -1,0 +1,249 @@
+---
+title: "Solutions 9.7"
+output: html_notebook
+---
+1. Consider monthly sales and advertising data for an automotive parts company (data set advert).
+```{r}
+library(fpp2)
+advert
+```
+a.Plot the data using autoplot. Why is it useful to set facets=TRUE?
+```{r}
+autoplot(advert, facets=TRUE)
+# Because the data are on different scales, they should not be plotted in the same panel. Setting facets=TRUE puts them in different panels.
+```
+b.model yt=a+bxt+ηtyt=a+bxt+ηt where ytyt denotes sales and xtxt denotes advertising using the tslm() function.
+```{r}
+(fit <- tslm(sales ~ advert, data=advert))
+```
+ c. Show that the residuals have significant autocorrelation.
+```{r}
+checkresiduals(fit)
+#Breusch-Godfrey test for serial correlation of order up to 5
+#
+#data:  Residuals from Linear regression model
+#LM test = 12.498, df = 5, p-value = 0.02856
+```
+d. What difference does it make if you use the Arima function instead:
+```{r}
+Arima(advert[,'sales'], xreg=advert[,'advert'], order=c(0,0,0))
+## Series: advert[, "sales"]
+## Regression with ARIMA(0,0,0) errors
+##
+## Coefficients:
+## intercept advert[, "advert"]
+## 78.734 0.534
+## s.e. 0.572 0.039
+##
+## sigma^2 estimated as 2.27: log likelihood=-42.83 ## AIC=91.66 AICc=92.86 BIC=95.2
+#The model is identical.
+```
+e. Refit the model using auto.arima(). How much difference does the error model make to the estimated parameters? What ARIMA model for the errors is selected?
+```{r}
+(fit <- auto.arima(advert[,'sales'], xreg=advert[,'advert']))
+## Series: advert[, "sales"]
+## Regression with ARIMA(0,1,0) errors
+##
+## Coefficients:
+##        xreg
+##       0.506
+## s.e.  0.021
+##
+## sigma^2 estimated as 1.2: log likelihood=-34.22 ## AIC=72.45 AICc=73.05 BIC=74.72
+
+#There is first order differencing, so the intercept disappears. The advert coefficient has changed a little. The error model is ARIMA(0,1,0).
+ 
+```
+f. Checktheresidualsofthefittedmodel.
+```{r}
+checkresiduals(fit)
+##
+## Ljung-Box test
+##
+## data: Residuals from Regression with ARIMA(0,1,0) errors ## Q* = 1.04, df = 3.8, p-value = 0.89
+##
+## Model df: 1. Total lags used: 4.8
+#All good.
+```
+g. Assuming the advertising budget for the next six months is exactly 10 units per month, produce sales forecasts with prediction intervals for the next six months.
+```{r}
+(fc <- forecast(fit, xreg=matrix(rep(10,6))))
+##
+## 25
+## 26
+## 27
+## 28
+## 29
+## 30
+##Point Forecast  Lo 80  Hi 80  Lo 95  Hi 95
+##        85.432 84.028 86.836 83.284 87.579
+##        85.432 83.446 87.418 82.395 88.469
+##        85.432 83.000 87.864 81.712 89.151
+##        85.432 82.623 88.240 81.137 89.727
+##        85.432 82.292 88.572 80.630 90.234
+##        85.432 81.992 88.871 80.171 90.692
+autoplot(fc) + xlab("Month") + ylab("Sales")
+```
+
+2.This exercise uses data set huron giving the level of Lake Huron from 1875–1972. 
+a. Fit a piecewise linear trend model to the Lake Huron data with a knot at 1920 and an ARMA error structure.
+```{r}
+trend <- time(huron)
+trend2 <- pmax(trend-1920, 0)
+fit <- auto.arima(huron, xreg=cbind(trend,trend2))
+```
+b. Forecast the level for the next 30 years.
+```{r}
+trend <- max(time(huron)) + seq(30)
+trend2 <- trend-1920
+fc <- forecast(fit,xreg=cbind(trend,trend2)) 
+autoplot(fc) +
+autolayer(huron - residuals(fit, type='regression'), series="Fitted trend")
+```
+
+3. This exercise concerns motel: the total monthly takings from accommodation and the total room nights occupied at hotels, motels, and guest houses in Victoria, Australia, between January 1980 and June 1995. Total monthly takings are in thousands of Australian dollars; total room nights occupied are in thousands.
+ a. Use the data to calculate the average cost of a night’s accommodation in Victoria each month.
+```{r}
+avecost <- motel[,"Takings"] / motel[,"Roomnights"]
+```
+b. Use cpimel to estimate the monthly CPI.
+```{r}
+#cpimel contains quarterly CPI values. We can use linear approximation to interpolate the quarterly data to obtain monthly CPI.
+qcpi <- ts(approx(time(cpimel), cpimel, time(motel), rule=2)$y, start=start(motel), frequency=frequency(motel))
+```
+c. Produce time series plots of both variables and explain why logarithms of both variables need to be taken before fitting any models.
+```{r}
+autoplot(cbind(avecost, qcpi), facets=TRUE)
+```
+We expect avecost to be related to CPI, but the variance of average cost increases with the level. So logs will help. Also, average cost is likely to be a multiple of CPI as it will depend on lots of individual costs, each of which will increase with CPI. So logarithms will turn the multiplicative relationship into something additive which we can model.
+```{r}
+autoplot(log(cbind(avecost, qcpi)), facets=TRUE)
+```
+ d. Fit an appropriate regression model with ARIMA errors. Explain your reasoning in arriving at the final model.
+```{r}
+(fit <- auto.arima(avecost, xreg=log(qcpi), lambda=0, biasadj=TRUE))
+## Series: avecost
+## Regression with ARIMA(2,0,3)(0,1,1)[12] errors
+## Box Cox transformation: lambda= 0
+##
+## Coefficients:
+## ar1 ar2 ma1 ma2 ma3 sma1 xreg ## 1.510 -0.520 -1.102 0.221 0.146 -0.645 1.048 ## s.e. 0.277 0.276 0.279 0.211 0.084 0.084 0.316 ##
+## sigma^2 estimated as 0.000375: log likelihood=440.02
+## AIC=-864.04 AICc=-863.17 BIC=-838.77
+```
+ e. Forecast the average price per room for the next twelve months using your fitted model. (Hint: You will need to produce forecasts of the CPI figures first.)
+```{r}
+fitcpi <- auto.arima(qcpi) 
+fccpi <- forecast(fitcpi, h=12) 
+autoplot(fccpi)
+```
+Now we can forecast average cost
+```{r}
+fc <- forecast(fit, xreg=log(fccpi$mean)) 
+autoplot(fc)
+```
+
+4. Consider the gasoline series.
+a. Using tslm, fit a harmonic regression with a piecewise linear time trend to the full gasoline series. Select the position of the knots in the trend and the appropriate number of Fourier terms to include by minimizing the AICc or CV value.
+
+Let’s optimize using 2 break points and an unknown number of Fourier terms. Because the number of Fourier terms is integer, we can’t just use optim. So we will use optim for the breakpoints but then loop over the Fourier terms.
+```{r}
+getcv <- function(breaks, K) {
+  trend2 <- pmax(seq_along(gasoline) - breaks[1], 0)
+  trend3 <- pmax(seq_along(gasoline) - breaks[2], 0) 
+  harmonics <- fourier(gasoline, K=K)
+  fit <- tslm(gasoline ~ harmonics + trend + trend2 + trend3)
+  return(CV(fit)[1])
+}
+cvk <- numeric(25) 
+for(k in seq(25))
+  cvk[k] <- optim(c(800,1100), getcv, K=k)$value 
+K <- which.min(cvk)
+# Best breaks
+(breaks <- optim(c(800,1100), getcv, K=K)$par)
+## [1]  832.0 1151.4
+trend2 <- pmax(seq_along(gasoline) - breaks[1], 0)
+trend3 <- pmax(seq_along(gasoline) - breaks[2], 0) 
+harmonics <- fourier(gasoline, K=K)
+fit <- tslm(gasoline ~ harmonics + trend + trend2 + trend3)
+```
+b. Now refit the model using auto.arima to allow for correlated errors, keeping the same predictor variables as you used with tslm.
+```{r}
+trend <- seq_along(gasoline)
+fit <- auto.arima(gasoline, xreg=cbind(trend,trend2,trend3,harmonics), seasonal=FALSE)
+```
+c. Check the residuals of the final model using the checkresiduals() function. Do they look sufficiently like white noise to continue? If not, try modifying your model, or removing the first few years of data.
+```{r}
+checkresiduals(fit)
+##
+## Ljung-Box test
+##
+## data: Residuals from Regression with ARIMA(1,0,3) errors ## Q* = 134, df = 72.4, p-value = 1.6e-05
+##
+## Model df: 32. Total lags used: 104.357142857143
+
+#It fails the test, but the correlations are tiny, and I’m happy to use that model.
+```
+d. Once you have a model with white noise residuals, produce forecasts for the next year.
+```{r}
+trend <- length(gasoline) + seq(52)
+trend2 <- length(gasoline) - breaks[1] + seq(52)
+trend3 <- length(gasoline) - breaks[2] + seq(52)
+harmonics <- fourier(gasoline, K=K, h=52)
+fc <- forecast(fit, xreg=cbind(trend,trend2,trend3,harmonics)) 
+autoplot(fc)
+```
+ 5. see PDF
+ 
+ 6. For the retail time series considered in earlier chapters: a. Develop an appropriate dynamic regression model with Fourier terms for the seasonality. Use the AIC to select the number of Fourier terms to include in the model. (You will probably need to use the same Box-Cox transformation you identified previously.)
+```{r}
+#retaildata <- readxl::read_excel("data/retail.xlsx", skip=1)
+retaildata <- retail
+myts <- ts(retaildata[,"A3349873A"], frequency=12, start=c(1982,4))
+# Function to find K
+getaicc <- function(K) {
+  harmonics <- fourier(myts, K=K)
+  fit <- try(auto.arima(myts, xreg=harmonics, lambda=0)) 
+  if("try-error" %in% class(fit))
+    return(Inf) 
+  else
+    return(fit[['aicc']])
+}
+aicck <- numeric(6) 
+for(k in seq(6))
+  aicck[k] <- getaicc(k)
+harmonics <- fourier(myts, K=which.min(aicck))
+(fit <- auto.arima(myts, xreg=harmonics, lambda=0))
+## Series: myts
+## Regression with ARIMA(0,1,3)(1,0,1)[12] errors
+## Box Cox transformation: lambda= 0
+##
+## Coefficients:
+## ma1 ma2 ma3 sar1 sma1 drift S1-12 C1-12 S2-12 ## -0.391 -0.152 0.081 0.601 -0.272 0.005 -0.114 -0.035 0.042
+## s.e. 0.056 0.059 0.054 0.135 0.149 0.002 0.007 0.007 0.006 ## C2-12 S3-12 C3-12 S4-12 C4-12 S5-12 C5-12 C6-12
+## -0.076 0.076 0.022 -0.020 0.060 -0.066 0.005 -0.019
+## s.e. 0.006 0.005 0.005 0.005 0.005 0.004 0.004 0.002
+##
+## sigma^2 estimated as 0.00233: log likelihood=619.81
+## AIC=-1203.6 AICc=-1201.7 BIC=-1132.7
+
+#All possible Fourier terms are included (i.e., K=6 K=6). 
+ 
+```
+b. Check the residuals of the fitted model. Does the residual series look like white noise?
+```{r}
+checkresiduals(fit)
+##
+## Ljung-Box test
+##
+## data: Residuals from Regression with ARIMA(0,1,3)(1,0,1)[12] errors
+## Q* = 26, df = 7, p-value = 0.00051
+##
+## Model df: 17.   Total lags used: 24
+```
+ c. Compare the forecasts with those you obtained earlier using alternative models.
+```{r}
+fc <- forecast(fit, xreg=fourier(myts, K=which.min(aicck), h=36)) 
+autoplot(fc)
+# That looks fairly similar to forecasts obtained earlier. To properly compare them, we would need to use a training/test set, or use time series cross-validation.
+```

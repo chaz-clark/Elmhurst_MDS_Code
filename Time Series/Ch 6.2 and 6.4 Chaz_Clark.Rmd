@@ -1,0 +1,98 @@
+---
+title: "Chapter 6 Chaz Clark"
+output:
+  html_document:
+    df_print: paged
+---
+```{r}
+library(fpp2)
+plastics
+```
+
+6.2The plastics data set consists of the monthly sales (in thousands) of product A for a plastics manufacturer for five years.
+a.Plot the time series of sales of product A. Can you identify seasonal fluctuations and/or a trend-cycle?
+```{r}
+autoplot(plastics)
+```
+ANSWER:THere is well defined cycles in the data, as well as a generally linear up trend.
+
+b.Use a classical multiplicative decomposition to calculate the trend-cycle and seasonal indices.
+```{r}
+plastics %>% decompose(type = "multiplicative") %>% 
+  autoplot() + xlab("Year") +
+  ggtitle("Classical multiplicative decomposition of plastics")
+```
+
+c.Do the results support the graphical interpretation from part a?
+ANSWER: yes the initial assessment from a matches the charts produced in b
+
+d.Compute and plot the seasonally adjusted data.
+```{r}
+library(seasonal)
+library(xts)
+plastics <- ts(plastics,frequency = 12, start = 2001)
+#note the years of the data are not in the description but seas() has a >year999 error this was my way to get arround it
+plastics %>% seas() -> fit
+fit
+```
+```{r}
+autoplot(plastics, series="Data") +
+  autolayer(trendcycle(fit), series="Trend") +
+  autolayer(seasadj(fit), series="Seasonally Adjusted") +
+  xlab("Year") + ylab("New orders index") +
+  ggtitle("Plastics Manufacturing") +
+  scale_colour_manual(values=c("gray","blue","red"),
+             breaks=c("Data","Seasonally Adjusted","Trend"))
+```
+
+e.Change one observation to be an outlier (e.g., add 500 to one observation), and recompute the seasonally adjusted data. What is the effect of the outlier?
+```{r}
+plastics[12]
+plastics[12]<-plastics[12]+500
+plastics[12]
+```
+```{r}
+plastics %>% seas() -> fit
+fit
+```
+```{r}
+autoplot(plastics, series="Data") +
+  autolayer(trendcycle(fit), series="Trend") +
+  autolayer(seasadj(fit), series="Seasonally Adjusted") +
+  xlab("Year") + ylab("New orders index") +
+  ggtitle("Plastics Manufacturing") +
+  scale_colour_manual(values=c("gray","blue","red"),
+             breaks=c("Data","Seasonally Adjusted","Trend"))
+```
+ANSWER: the outlier had a large affect on the seasnally adjusted data model.
+
+f.Does it make any difference if the outlier is near the end rather than in the middle of the time series?
+```{r}
+plastics[30]<-plastics[30]+500
+plastics[50]<-plastics[50]+500
+plastics %>% seas() -> fit
+autoplot(plastics, series="Data") +
+  autolayer(trendcycle(fit), series="Trend") +
+  autolayer(seasadj(fit), series="Seasonally Adjusted") +
+  xlab("Year") + ylab("New orders index") +
+  ggtitle("Plastics Manufacturing") +
+  scale_colour_manual(values=c("gray","blue","red"),
+             breaks=c("Data","Seasonally Adjusted","Trend"))
+```
+ANSWER: It appear that the outlier near the eand has a higher impact due to the trend having a higher trend at tehat time.
+
+6.4 Figures 6.16 and 6.17 show the result of decomposing the number of persons in the civilian labour force in Australia each month from February 1978 to August 1995.
+
+Seasonal component from the decomposition shown in the previous figure.
+Figure 6.17: Seasonal component from the decomposition shown in the previous figure.
+
+a. Write about 3–5 sentences describing the results of the decomposition. Pay particular attention to the scales of the graphs in making your interpretation.
+ANSWER:
+1. the data is very linear in its trend upward, with some variation
+2. seasonality seems strong and increasing over time
+3. the volitility of the seasonality seems to increase over time, higher highs and lower lows
+
+Note: i am not sure how to read the scales for the seaspnal sub-series plot to make sense of it just yet
+
+b. Is the recession of 1991/1992 visible in the estimated components?
+ANSWER: yes there is a dip in the data and the remainder is significantly strong in 1991. If a dummy variable was created for these months it would be interesting to see if that explains that whold section of data or not.

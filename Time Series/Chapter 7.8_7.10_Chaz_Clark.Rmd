@@ -1,0 +1,163 @@
+---
+title: "Chapter 7.8-7.10 Chaz Clark"
+output: html_notebook
+---
+8. Recall your retail time series data (from Exercise 3 in Section 2.10).
+```{r}
+library(readxl)
+#retail <- read_excel("Documents/Documents - Mac Pro/Elmhurst/MDS 570 Time Series/Week4/retail.xlsx", skip = 1)
+head(retail) 
+```
+
+a. Why is multiplicative seasonality necessary for this series?
+```{r}
+library(fpp2)
+myts <- ts(retail[,"A3349873A"], frequency=12, start=c(1982,4))
+autoplot(myts)
+#The additive method is preferred when the seasonal variations are roughly constant through the series, while the multiplicative method is preferred when the seasonal variations are changing proportional to the level of the series
+#you can see in the plot of the data below that the magnitude is increasing along the length of the timesearies
+```
+
+b. Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.
+```{r}
+fit1 <- ets(myts,model = "MAN", damped = FALSE)
+#ETS(M,A,N): Holt’s linear method with multiplicative errors
+fit1 %>% forecast(h=8) %>% autoplot()
+```
+```{r}
+fit2 <- ets(myts,model = "MAN", damped = TRUE)
+#ETS(M,A,N): Holt’s linear method with multiplicative errors
+fit2 %>% forecast(h=8) %>% autoplot()
+```
+
+c.Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?
+```{r}
+round(accuracy(fit1),2)
+round(accuracy(fit2),2)
+#w/o dampening RSME 47.83
+#w/dampening   RSME 47.41
+#w/o deampening has a higher RSME
+#i prefer the w/dapmening but the numbers indicate otherwise
+```
+
+d. Check that the residuals from the best method look like white noise.
+```{r}
+fit1 %>% residuals(type='response') %>% autoplot()
+#i think it is not white noise and that there is still info in the residuals
+```
+
+e. Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve  approach from Exercise 8 in Section 3.7?
+```{r}
+
+#autoplot(myts) +
+#  autolayer(myts.train, series="Training") +
+#  autolayer(myts.test, series="Test")
+fc <- snaive(myts.train)
+accuracy(fc,myts.test)
+#RSME test set <- 71.44 
+```
+```{r}
+myts.train <- window(myts, end=c(2010,12))
+myts.test <- window(myts, start=2011)
+fc2 <- ets(myts.train)
+autoplot(fc2)
+#accuracy(fc2,myts.test)
+#Error in testaccuracy(f, x, test, d, D) : Unknown list structure
+```
+
+9. For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?
+```{r}
+myts.train
+# data appears to be ts and was built with only the columna and ts() applied the start date
+#myts <- ts(retail[,"A3349873A"], frequency=12, start=c(1982,4))
+#see workign solution with STLM() below
+```
+
+```{r}
+#decomp <- stl(myts.train, s.window = "periodic")
+#plot(forecast(decomp))
+#https://pkg.robjhyndman.com/forecast/reference/forecast.stl.html
+#Error in stl(myts.train, s.window = "periodic") : only univariate series are allowed
+
+myts.train %>% stlm(s.window = 13, robust = TRUE) %>% 
+  forecast(method = "ets", h = 36, lambda = BoxCox.lambda(myts.train))
+#Error in stl(., s.window = 13, robust = TRUE) : only univariate series are allowed
+
+#https://github.com/JehyeonHeo/Forecasting_with_R_practices/blob/master/Chapter7.rmd
+#found another person with teh same issue that had to modify the code to to be stlm vs stl
+```
+```{r}
+myts.train %>%
+  stlm(s.window = 13,robust = TRUE, method = "ets", lambda = BoxCox.lambda(myts.train), biasadj = NULL) %>%
+  forecast(h = 36, lambda = BoxCox.lambda(myts.train),biasadj = FALSE) %>% 
+  autoplot()
+```
+
+10. For this exercise use data set ukcars, the quarterly UK passenger vehicle production data from 1977Q1–2005Q1.
+a. Plot the data and describe the main features of the series.
+```{r}
+autoplot(ukcars)
+#positive and negative trends in the data *this excludes us using a certain type 
+#variation in seasonality appears to fluxuate (perhaps mutiplicative)
+```
+
+b. Decompose the series using STL and obtain the seasonally adjusted data.
+```{r}
+myCars <- ts(ukcars, frequency=12)
+MyCarsDecomp <- myCars %>%
+  stl(s.window = 4, robust = TRUE) %>% seasadj()
+plot(MyCarsDecomp)
+```
+
+c. Forecast the next two years of the series using an additive damped trend method applied to the seasonally adjusted data. (This can be done in one step using stlf() with arguments etsmodel="AAN", damped=TRUE.)
+```{r}
+fit3 <- MyCarsDecomp %>% stlf(etsmodel = "AAN", damped = TRUE) 
+fit3%>% autoplot(PI = FALSE)
+```
+
+d. Forecast the next two years of the series using Holt’s linear method applied to the seasonally adjusted data (as before but with damped=FALSE).
+```{r}
+fit4 <- MyCarsDecomp %>% stlf( etsmodel = "AAN", damped = FALSE) 
+fit4 %>% autoplot(PI = FALSE)
+```
+
+e. Now use ets() to choose a seasonal model for the data.
+```{r}
+fit5 <- ets(myCars)
+fit5 %>% forecast() %>% autoplot(PI = FALSE)
+```
+
+f. Compare the RMSE of the ETS model with the RMSE of the models you obtained using STL decompositions. Which gives the better in-sample fits?
+```{r}
+#accuracy(fit5)
+# RSME 24.50
+#accuracy(fit4)
+# RSME 23.76
+#accuracy(fit3)
+# RSME 23.73
+
+#Letting ETS pick the model gives us the best results ETS(A,N,A)
+summary(fit5)
+```
+
+g. Compare the forecasts from the three approaches? Which seems most reasonable?
+```{r}
+# i think the ANA result fits well
+# 2nd rank is Hold with dampening
+# 3rd rank is Holt w/o dampening
+```
+
+h. Check the residuals of your preferred model.
+```{r}
+cbind('Residuals' = residuals(fit5),
+      'Forecast errors' = residuals(fit5,type='response')) %>%
+  autoplot(facet=TRUE) + xlab("Year") + ylab("")
+#does not appear to have any info left in the data, just white noise
+```
+
+```{r}
+checkresiduals(fit5)
+#data seems a little skewed, most ACF's are within the bounds, those out are later lags
+#the lags that are outside are not he top 3 and are not significantly out of the threshold
+```
+

@@ -1,0 +1,282 @@
+---
+title: "Chapter 8.1-8.3, 8.5 Chaz Clark"
+output: html_notebook
+---
+Figure 8.31 shows the ACFs for 36 random numbers, 360 random numbers and 1,000 random numbers.
+a. Explain the differences among these figures. Do they all indicate that the data are white noise?
+```{r}
+#Yes there are no significant Lags outside the bounds of the blue lines so statistically not significant, or no correlation in the data between lags
+```
+b.Why are the critical values at different distances from the mean of zero? Why are the autocorrelations different in each figure when they each refer to white noise?
+```{r}
+#The critical values differ based on what is statistically significant at a 95% level, where these three have differeing size of datasets they will have different values.
+#White noise signifies a static dataset, but not all white noise is created equal. The sequence of the random generated nubmers will play a factor in the lags of the data, and thus each will ahve a different looking white noise.
+```
+
+2.A classic example of a non-stationary series is the daily closing IBM stock price series (data set ibmclose). Use R to plot the daily closing prices for IBM stock and the ACF and PACF. Explain how each plot shows that the series is non-stationary and should be differenced.
+```{r}
+library(fpp2)
+#ibmclose
+autoplot(ibmclose)
+#you can see small repeating patterns in the chart indicating is non-stationary
+```
+```{r}
+ggAcf(ibmclose)
+#here you can see that in the ACF plot all lags are outside the blue lines indicating non-stationary
+```
+```{r}
+ggPacf(ibmclose)
+#in the PACF plot Lag1 is significantly outside of the lines, this too indicates non-stationary
+```
+
+3.For the following series, find an appropriate Box-Cox transformation and order of differencing in order to obtain stationary data.
+a. usnetelec
+```{r}
+#usnetelec  %>% nsdiffs()
+#Error in nsdiffs(.) : Non seasonal data
+#usnetelec  %>% log() %>% ndiffs()
+#[1] 2
+#this indicates no seasonality but that two levels of diff() is required for stationary data
+
+#usnetelec %>% diff() %>% Box.test(type="Ljung-Box")
+#X-squared = 0.8508, df = 1, p-value = 0.3563
+#This contradicts ndiffs() indicates that diff() is needed once 
+
+#library(urca)
+#usnetelec %>% ur.kpss() %>% summary()
+#usnetelec %>% diff() %>%  ur.kpss() %>% summary()
+#this is less than 1% so 1 diff is enough
+
+####################### 
+# KPSS Unit Root Test # 
+####################### 
+
+#Test is of type: mu with 3 lags. 
+#
+#Value of test-statistic is: 0.1585 
+#
+#Critical value for a significance level of: 
+#                10pct  5pct 2.5pct  1pct
+#critical values 0.347 0.463  0.574 0.739
+
+#the chart below confirms white noise with a single diff()
+cbind("Original Data" = usnetelec,
+      "BoxCox" = BoxCox(usnetelec, lambda = 0),
+      #"Seasonally\n differenced logs" =
+        #diff(log(usnetelec),12),
+      "Single\n differenced logs" =
+        diff(BoxCox(usnetelec, lambda = 0),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") 
+```
+b. usgdp
+```{r}
+#usgdp  %>% nsdiffs()
+#[1] 0
+#usgdp  %>% log() %>% ndiffs()
+#[1] 1
+#this indicates no seasonality but that one levels of diff() is required for stationary data
+
+#usgdp %>% diff() %>% Box.test(type="Ljung-Box")
+#X-squared = 39.187, df = 1, p-value = 3.85e-10
+#This also indicates that diff() is needed once 
+
+#library(urca)
+#usgdp %>% ur.kpss() %>% summary()
+#sgdp %>% diff() %>%  ur.kpss() %>% summary()
+#this is higher than 1% but under 2, in this case i defer to the previous tests
+
+####################### 
+# KPSS Unit Root Test # 
+####################### 
+
+#Test is of type: mu with 4 lags. 
+#
+#Value of test-statistic is: 1.7909 
+#
+#Critical value for a significance level of: 
+#                10pct  5pct 2.5pct  1pct
+#critical values 0.347 0.463  0.574 0.739
+
+#the chart below signals white noise after 1 diff()
+cbind("Original Data" = usgdp,
+      "BoxCox" = BoxCox(usgdp, lambda = 0),
+      #"Seasonally\n differenced logs" =
+        #diff(log(usgdp),12),
+      "Single\n differenced logs" =
+        diff(BoxCox(usgdp, lambda = 0),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") 
+```
+c. mcopper
+```{r}
+#mcopper  %>% nsdiffs()
+#[1] 0
+#mcopper  %>% log() %>% ndiffs()
+#[1] 1
+#this indicates no seasonality but that one levels of diff() is required for stationary data
+
+#mcopper %>% diff() %>% Box.test(type="Ljung-Box")
+#X-squared = 38.911, df = 1, p-value = 4.435e-10
+#This also indicates that diff() is needed once 
+
+#library(urca)
+#mcopper %>% ur.kpss() %>% summary()
+#mcopper %>% diff() %>%  ur.kpss() %>% summary()
+#this is less than 1% so only 1 diff() is needed
+
+####################### 
+# KPSS Unit Root Test # 
+####################### 
+
+#Test is of type: mu with 6 lags. 
+#
+#Value of test-statistic is: 0.1843 
+#
+#Critical value for a significance level of: 
+#                10pct  5pct 2.5pct  1pct
+#critical values 0.347 0.463  0.574 0.739
+
+#the chart below signals white noise after 1 diff() 
+cbind("Original Data" = mcopper,
+      "BoxCox" = BoxCox(mcopper, lambda = 0),
+      #"Seasonally\n differenced logs" =
+        #diff(log(mcopper),12),
+      "Single\n differenced logs" =
+        diff(BoxCox(mcopper, lambda = 0),1),
+      "Double\n difference  logs" = 
+        diff(diff(log(mcopper),12),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") 
+```
+d. enplanements
+```{r}
+#enplanements  %>% nsdiffs()
+#[1] 1
+#enplanements  %>% log() %>% ndiffs()
+#[1] 1
+#this indicates one diff() for seasonality and that one levels of diff() is required for stationary data
+
+#enplanements %>% diff() %>% Box.test(type="Ljung-Box")
+#X-squared = 12.948, df = 1, p-value = 0.0003203
+#This also indicates that diff() is needed once 
+
+#library(urca)
+#enplanements %>% ur.kpss() %>% summary()
+#enplanements %>% diff() %>%  ur.kpss() %>% summary()
+#this is less than 1% so only 1 diff() is needed
+
+####################### 
+# KPSS Unit Root Test # 
+####################### 
+
+#Test is of type: mu with 5 lags. 
+#
+#Value of test-statistic is: 0.0086 
+#
+#Critical value for a significance level of: 
+#                10pct  5pct 2.5pct  1pct
+#critical values 0.347 0.463  0.574 0.739
+
+#the chart below signals white noise after 1 diff() seasonal and 1 diff() non-seasonal
+cbind("Original Data" = enplanements,
+      "BoxCox" = BoxCox(enplanements, lambda = 0),
+      "Seasonally\n differenced logs" =
+        diff(log(enplanements),12),
+      "Single\n differenced logs" =
+        diff(BoxCox(enplanements, lambda = 0),1),
+      "Double\n difference  logs" = 
+        diff(diff(log(enplanements),12),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") 
+```
+e. visitors
+```{r}
+#visitors  %>% nsdiffs()
+#[1] 1
+#visitors  %>% log() %>% ndiffs()
+#[1] 1
+#this indicates no seasonality but that one levels of diff() is required for stationary data
+
+#visitors %>% diff() %>% Box.test(type="Ljung-Box")
+#X-squared = 29.101, df = 1, p-value = 6.871e-08
+#This also indicates that diff() is needed once 
+
+#library(urca)
+#visitors %>% ur.kpss() %>% summary()
+#visitors %>% diff() %>%  ur.kpss() %>% summary()
+#this is less than 1% so only 1 diff() is needed
+
+####################### 
+# KPSS Unit Root Test # 
+####################### 
+
+#Test is of type: mu with 4 lags. 
+#
+#Value of test-statistic is: 0.0191 
+#
+#Critical value for a significance level of: 
+#                10pct  5pct 2.5pct  1pct
+#critical values 0.347 0.463  0.574 0.739
+
+#the chart below signals white noise after 1 diff() seasonal and 1 diff() non-seasonal
+cbind("Original Data" = visitors,
+      "BoxCox" = BoxCox(visitors, lambda = 0),
+      "Seasonally\n differenced logs" =
+        diff(log(visitors),12),
+      "Single\n differenced logs" =
+        diff(BoxCox(visitors, lambda = 0),1),
+      "Double\n difference  logs" = 
+        diff(diff(log(visitors),12),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") 
+```
+
+5.For your retail data (from Exercise 3 in Section 2.10), find the appropriate order of differencing (after transformation if necessary) to obtain stationary data.
+```{r}
+library(readxl)
+retail <- readxl::read_excel("~/Documents/Documents - Mac Pro/Elmhurst/MDS 570 Time Series/Week4/retail.xlsx", 
+    skip = 1)
+myts <- ts(retail[,"A3349873A"],
+  frequency=12, start=c(1982,4))
+
+#myts  %>% nsdiffs()
+#[1] 1
+#myts  %>% log() %>% ndiffs()
+#[1] 1
+#this indicates no seasonality but that one levels of diff() is required for stationary data
+
+#myts %>% diff() %>% Box.test(type="Ljung-Box")
+#X-squared = 34.684, df = 1, p-value = 3.878e-09
+
+#This also indicates that diff() is needed once 
+
+#library(urca)
+#myts %>% ur.kpss() %>% summary()
+#myts %>% diff() %>%  ur.kpss() %>% summary()
+#this is less than 1% so only 1 diff() is needed
+
+####################### 
+# KPSS Unit Root Test # 
+####################### 
+
+#Test is of type: mu with 5 lags. 
+#
+#Value of test-statistic is: 0.0522 
+#
+#Critical value for a significance level of: 
+#                10pct  5pct 2.5pct  1pct
+#critical values 0.347 0.463  0.574 0.739
+
+#the chart below signals white noise after 1 diff() seasonal and 1 diff() non-seasonal
+cbind("Original Data" = myts,
+      "BoxCox" = BoxCox(myts, lambda = 0),
+      "Seasonally\n differenced logs" =
+        diff(log(myts),12),
+      "Single\n differenced logs" =
+        diff(BoxCox(myts, lambda = 0),1),
+      "Double\n difference  logs" = 
+        diff(diff(log(myts),12),1)) %>%
+  autoplot(facets=TRUE) +
+    xlab("Year") + ylab("") 
+```

@@ -1,0 +1,137 @@
+---
+title: "Chapter 11 Solutions"
+output: html_notebook
+---
+1.Use the tbats() function to model your retail time series.
+```{r}
+library(fpp2)
+#retaildata <- readxl::read_excel("data/retail.xlsx", skip=1)
+retaildata <- retail
+myts <- ts(retaildata[,"A3349873A"], frequency=12, start=c(1982,4)) 
+(fit <- tbats(myts))
+## TBATS(0.126, {5,0}, 1, {<12,5>})
+##
+## Call: tbats(y = myts)
+##
+## Parameters
+##   Lambda: 0.12556
+##   Alpha: 0.20911
+##   Beta: -0.00056331
+##   Damping Parameter: 1
+##   Gamma-1 Values: -0.00052455
+##   Gamma-2 Values: 0.00047011
+## AR coefficients: 0.1463 0.23261 -0.058188 0.2663 -0.12096 ##
+## Seed States:
+## [,1]
+##  [1,]  5.3435297
+##  [2,]  0.0095283
+##  [3,] -0.1748164
+##  [4,] -0.0065168
+##  [5,]  0.1537930
+##  [6,] -0.0932841
+##  [7,] -0.0743813
+##  [8,] -0.1614730
+##  [9,]  0.1737015
+## [10,] -0.0385649
+## [11,] -0.0866649
+## [12,]  0.1098590
+## [13,]  0.0000000
+## [14,]  0.0000000
+## [15,]  0.0000000
+## [16,]  0.0000000
+## [17,]  0.0000000
+## attr(,"lambda")
+## [1] 0.12556
+##
+## Sigma: 0.10464
+## AIC: 4114.7
+```
+a. Check the residuals and produce forecasts.
+```{r}
+checkresiduals(fit)
+##
+##  Ljung-Box test
+##
+## data:  Residuals from TBATS
+## Q* = 71.3, df = 3, p-value = 2.2e-15
+##
+## Model df: 27.   Total lags used: 30
+```
+There is still significant seasonal autocorrelation left in the residuals.
+```{r}
+fit %>% forecast() %>% autoplot()
+```
+The forecasts look ok, although the prediction intervals are probably too narrow.
+b. Does this completely automated approach work for these data? 
+  Not too bad, but the remaining serial correlation is a problem.
+c. Have you saved any degrees of freedom by using Fourier terms rather than seasonal differencing?
+
+5×2=105×2=10 degrees of freedom have been used on the Fourier terms, plus the two gamma values gives 12 degrees of freedom in total. So this approach hasn’t saved any degrees of freedom.
+
+2. Consider the weekly data on US finished motor gasoline products supplied (millions of barrels per day) (series gasoline):
+a. Fit a TBATS model to these data.
+```{r}
+(fit <- tbats(gasoline))
+## TBATS(1, {0,0}, -, {<52.18,12>})
+##
+## Call: tbats(y = gasoline)
+##
+## Parameters
+##   Alpha: 0.11796
+##   Gamma-1 Values: -0.0016895
+##   Gamma-2 Values: 0.00092382
+##
+## Seed States:
+##             [,1]
+##  [1,]  7.0928680
+##  [2,] -0.2495915
+##  [3,] -0.0291974
+##  [4,] -0.0837006
+##  [5,] -0.0076363
+##  [6,] -0.0393626
+##  [7,]  0.0145572
+##  [8,]  0.0457952
+##  [9,]  0.0276428
+## [10,] -0.0095212
+## [11,] -0.0137375
+## [12,] -0.0045340
+## [13,] -0.0308165
+## [14,]  0.0626131
+## [15,] -0.0462768
+## [16,]  0.0577210
+## [17,]  0.0404051
+## [18,]  0.0258102
+## [19,]  0.0646363
+## [20,] -0.0087608
+## [21,]  0.0020842
+## [22,] -0.0186859
+## [23,] -0.0300785
+## [24,]  0.0183801
+## [25,]  0.0138171
+##
+## Sigma: 0.23324
+## AIC: 5882.7
+```
+b. Check the residuals and produce forecasts.
+```{r}
+checkresiduals(fit)
+##
+## Ljung-Box test
+##
+## data: Residuals from TBATS
+## Q* = 143, df = 76.4, p-value = 6.3e-06
+##
+## Model df: 28. Total lags used: 104.357142857143
+```
+There is a large number of significant autocorrelation spikes, but they are all tiny, so will hardly affect the forecasts.
+```{r}
+fit %>% forecast() %>% autoplot()
+```
+ c. Could you model these data using any of the other methods we have considered in this book?
+A harmonic dynamic regression could also have been used. But all other methods assume an integer seasonal period.
+
+3. Experiment with using nnetar() on your retail data and other data we have considered in previous chapters.
+```{r}
+myts %>% nnetar() %>% forecast(h=48) %>% autoplot()
+```
+Oh dear, that is dreadful. Neural network models do not work well when there is trend in the data.

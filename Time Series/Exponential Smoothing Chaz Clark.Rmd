@@ -1,0 +1,83 @@
+---
+title: "Exponential Smoothing Using My Data _ Chaz Clark"
+output: html_notebook
+---
+
+Choose some time series data of interest to you, perhaps data that might be applicable to your course project. Use some of the exponential smoothing methods you have been practicing to produce an initial forecast for these data. Use this forum to discuss your solutions, questions, and ideas.
+```{r}
+#load the libraries
+library(quantmod)
+library(xts)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(gapminder)
+library(TTR)
+library(plyr)
+```
+
+```{r}
+#get the data
+options("getSymbols.warning4.0"=FALSE)
+getSymbols('AAPL')
+tail(AAPL)
+#convert to dt
+AAPLdt <- data.table(Date=index(AAPL), coredata(AAPL))
+#convert to weekly
+AAPLw <- to.weekly(AAPLdt)
+#convert to monthly
+AAPLm <- to.monthly(AAPLdt)
+#convert dt to ts
+mytsd <- ts(AAPLdt[,"AAPL.Close"], frequency=7, start=c(2007,3))
+mytsw <- ts(AAPLw[,"AAPLdt.Close"], frequency=7, start=c(2007,3))
+mytsm <- ts(AAPLm[,"AAPLdt.Close"], frequency=7, start=c(2007,3))
+```
+
+```{r}
+mytsd %>% autoplot()
+```
+
+```{r}
+fitd <- ets(mytsd)
+summary(fitd)
+```
+
+```{r}
+fitd %>% forecast() %>% autoplot(PI = TRUE)
+```
+```{r}
+checkresiduals(fitd)
+```
+
+
+```{r}
+mytsw %>% autoplot()
+```
+
+```{r}
+fitw <- ets(mytsw)
+summary(fitw)
+```
+```{r}
+fitw %>% forecast() %>% autoplot(PI = TRUE)
+```
+```{r}
+checkresiduals(fitw)
+```
+
+```{r}
+mytsm %>% autoplot()
+```
+```{r}
+fitm <- ets(mytsm)
+summary(fitm)
+```
+
+```{r}
+fitm %>% forecast() %>% autoplot(PI = TRUE)
+```
+
+```{r}
+checkresiduals(fitm)
+```
+
